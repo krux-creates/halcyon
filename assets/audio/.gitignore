@@ -1,0 +1,5 @@
+# your own copies of the songs stay on this machine: never commit or deploy them
+*.mp3
+*.m4a
+*.wav
+*.ogg

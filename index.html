@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>HALCYON · Descents to Titan</title>
+    <meta name="description" content="HALCYON: a fictional passenger line that flies you down through Titan's haze to Kraken Port, a floating city on a methane sea. Three.js WebGPU." />
+    <meta name="theme-color" content="#0a0a0b" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Saira:wdth,wght@50..125,100..900&family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;500;700;900&family=Tektur:wdth,wght@75..100,400..900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&text=%E3%82%AF%E3%83%A9%E3%83%BC%E3%82%B1%E3%83%B3%E6%B8%AF%E7%84%A1%E9%99%90%E5%9F%8E%E6%90%AD%E4%B9%97%E8%A6%96%E8%9F%B9%E5%AF%BA%E5%A1%94%E5%8C%BA%E5%A4%A9%E9%BE%8D%E9%96%A3%E7%95%8C%E3%81%8B%E3%81%AB%E5%A4%9C%E5%B8%82%E6%B5%B7%E6%9C%88%E6%A5%BC&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.webgpu.js",
+          "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.webgpu.js",
+          "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.webgpu.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body data-scene="port">
+    <canvas id="scene" aria-label="Kraken Port, a floating city on Titan's methane sea"></canvas>
+    <div id="ui" class="ui"></div>
+    <div id="loader" class="loader" role="status" aria-live="polite">
+      <div class="shoji shoji-l" aria-hidden="true"><i></i></div>
+      <div class="shoji shoji-r" aria-hidden="true"><i></i></div>
+      <div class="ld">
+        <svg class="ld-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15c3-5 6-7 9-7s6 2 9 7" /><path d="M7 15c1.6-2.4 3.3-3.6 5-3.6S15.4 12.6 17 15" /><circle cx="12" cy="17.4" r="1.4" /></svg>
+        <div class="ld-glyph" aria-hidden="true"><span>ク</span></div>
+        <p class="ld-name">HALCYON LINES <b>·</b> KRAKEN PORT <b>·</b> TITAN</p>
+        <div class="ld-bar" aria-hidden="true"><i></i></div>
+        <div class="ld-row"><span class="ld-status">Flooding the canals</span><span class="ld-pct">0%</span></div>
+      </div>
+    </div>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

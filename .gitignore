@@ -1,0 +1,9 @@
+# screenshots and test captures (hundreds of MB), retired code, your own song files, local tooling state
+qa/
+.retired/
+assets/audio/*.mp3
+assets/audio/*.m4a
+assets/audio/*.wav
+.DS_Store
+.vercel
+.env*

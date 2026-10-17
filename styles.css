@@ -1,0 +1,2535 @@
+/* HALCYON: the design language extracted from Rive City (see references/skillui-rive-city/DESIGN-LANGUAGE.md).
+   Near-black flat chrome, one amber accent, a ring for elevation, 2px / 5px / pill radii, a 4px grid,
+   a tracked mono label voice and a wide display voice for numbers. No gradients, no blur in the chrome. */
+:root {
+  --ink-0: #0a0a0b;
+  --ink-1: #0f0f11;
+  --ink-2: #1e1e1e;
+  --paper: #f0ebe3;
+  --paper-dom: #f4f4f4;
+  --mute: rgba(240, 235, 227, 0.38);
+  --dim: rgba(240, 235, 227, 0.6);
+  --line: rgba(240, 235, 227, 0.14);
+  --line-2: rgba(240, 235, 227, 0.24);
+  --amber: #f0a900;
+  --amber-fill: rgba(240, 169, 0, 0.18);
+  --amber-line: rgba(240, 169, 0, 0.7);
+  --cyan: #3fe3e8;
+  --red: #ff3b30;
+  --gold: #d9b26a;
+  --pill: rgba(15, 15, 17, 0.86);
+  --ring: 0 0 0 1px var(--line);
+  --r-xs: 2px;
+  --r-sm: 5px;
+  --r-pill: 9999px;
+  --mono: "Share Tech Mono", ui-monospace, monospace;
+  --sans: "Saira", system-ui, sans-serif;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ink-2);
+  color: var(--paper);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+.ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ---- loader: Kage's thin progress line and kanji, Unseen's single cycling glyph; it leaves as two shoji doors
+   sliding apart over the scene ---------------------------------------------------------------------------------------- */
+.loader {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+}
+.loader.is-done {
+  pointer-events: none;
+}
+.shoji {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50.5%;
+  background: #07060b;
+  transition: transform 1250ms cubic-bezier(0.77, 0, 0.18, 1);
+}
+.shoji-l {
+  left: 0;
+}
+.shoji-r {
+  right: 0;
+}
+/* a faint lattice and a lit edge where the doors meet */
+.shoji i {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 119px, rgba(240, 235, 227, 0.035) 119px 120px),
+    repeating-linear-gradient(0deg, transparent 0 159px, rgba(240, 235, 227, 0.035) 159px 160px);
+}
+.shoji-l::after,
+.shoji-r::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 61, 187, 0.5);
+  box-shadow: 0 0 18px 2px rgba(255, 61, 187, 0.45);
+  opacity: 0;
+  transition: opacity 400ms;
+}
+.shoji-l::after {
+  right: 0;
+}
+.shoji-r::after {
+  left: 0;
+}
+.loader.is-opening .shoji-l::after,
+.loader.is-opening .shoji-r::after {
+  opacity: 1;
+}
+.loader.is-open .shoji-l {
+  transform: translateX(-101%);
+}
+.loader.is-open .shoji-r {
+  transform: translateX(101%);
+}
+.ld {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  width: min(440px, calc(100vw - 48px));
+  transition: opacity 400ms, transform 700ms var(--ease);
+}
+.loader.is-opening .ld {
+  opacity: 0;
+  transform: scale(0.98);
+}
+.ld-mark {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 28px;
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.ld-mark circle {
+  fill: var(--amber);
+  stroke: none;
+}
+.ld-glyph {
+  height: 96px;
+  overflow: hidden;
+  font: 300 84px/96px "Noto Sans JP", sans-serif;
+  color: var(--paper);
+}
+.ld-glyph span {
+  display: block;
+  animation: glyph-in 420ms var(--ease) both;
+}
+@keyframes glyph-in {
+  from {
+    transform: translateY(70%);
+    opacity: 0;
+    filter: blur(6px);
+  }
+}
+.ld-name {
+  margin: 16px 0 36px;
+  font: 11px/1 var(--mono);
+  letter-spacing: 0.28em;
+  color: var(--mute);
+}
+.ld-name b {
+  font-weight: 400;
+  color: var(--amber);
+}
+.ld-bar {
+  position: relative;
+  width: 100%;
+  height: 1px;
+  background: rgba(240, 235, 227, 0.14);
+}
+.ld-bar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: var(--paper);
+  box-shadow: 0 0 10px rgba(240, 235, 227, 0.6);
+  transition: width 380ms var(--ease);
+}
+.ld-row {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 14px;
+  font: 10px/1 var(--mono);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.ld-pct {
+  color: var(--paper);
+}
+@keyframes rive-spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* =====================================================================================================
+   HUD — Rive City's canvas UI rebuilt in the DOM: flat near-black pills, a hairline ring, tracked mono
+   labels, wide display numerals, amber for what is active. Every size on the 4px grid.
+   ===================================================================================================== */
+.hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  font-family: var(--mono);
+  color: var(--paper);
+}
+.hud button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+/* plates, in the Japanese cyberpunk HUD language: square corners, a hairline, an amber bracket at two corners */
+.pill,
+.chapters {
+  --br: var(--amber);
+  background:
+    linear-gradient(var(--br), var(--br)) left top / 9px 1px no-repeat,
+    linear-gradient(var(--br), var(--br)) left top / 1px 9px no-repeat,
+    linear-gradient(var(--br), var(--br)) right bottom / 9px 1px no-repeat,
+    linear-gradient(var(--br), var(--br)) right bottom / 1px 9px no-repeat,
+    var(--pill);
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--r-xs);
+  box-shadow: var(--ring);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+.hud-top {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+/* segmented: QUALITY  [HIGH]  MED  LOW */
+.seg {
+  gap: 4px;
+  padding: 0 8px 0 16px;
+}
+.seg-label {
+  color: var(--mute);
+  margin-right: 8px;
+}
+.seg button {
+  height: 26px;
+  padding: 0 11px;
+  border-radius: var(--r-xs);
+  color: var(--mute);
+  letter-spacing: 0.18em;
+  transition: color 120ms, background-color 120ms, box-shadow 120ms;
+}
+.seg button:hover {
+  color: var(--paper);
+}
+.seg button.is-on {
+  color: var(--amber);
+  background: var(--amber-fill);
+  box-shadow: inset 0 0 0 1px var(--amber-line), inset 0 -2px 0 var(--amber);
+}
+.seg button:focus-visible,
+.snd:focus-visible,
+.focus button:focus-visible {
+  outline: 1px solid var(--amber);
+  outline-offset: 2px;
+}
+/* brand */
+.brand {
+  color: var(--mute);
+  gap: 8px;
+  padding-right: 8px;
+}
+.brand .mark {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.brand .mark circle {
+  fill: var(--amber);
+  stroke: none;
+}
+.brand b {
+  font: 600 13px/1 var(--sans);
+  font-stretch: 125%;
+  letter-spacing: 0.24em;
+  color: var(--paper);
+}
+.brand .sep {
+  opacity: 0.5;
+}
+.snd {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  width: 30px;
+  height: 30px;
+  margin-left: 4px;
+  padding: 8px !important;
+  border-radius: var(--r-xs);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.snd[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px var(--amber-line);
+}
+.snd i {
+  width: 2px;
+  height: 4px;
+  background: var(--mute);
+  border-radius: 1px;
+  transition: height 120ms;
+}
+.snd[aria-pressed="true"] i {
+  background: var(--amber);
+  animation: eq 900ms ease-in-out infinite alternate;
+}
+.snd i:nth-child(2) {
+  animation-delay: -300ms !important;
+}
+.snd i:nth-child(3) {
+  animation-delay: -600ms !important;
+}
+.snd i:nth-child(4) {
+  animation-delay: -150ms !important;
+}
+@keyframes eq {
+  from {
+    height: 4px;
+  }
+  to {
+    height: 16px;
+  }
+}
+
+/* bottom: ticker over the keycap bar */
+.hud-bottom {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.ticker {
+  height: 36px;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--paper);
+  pointer-events: none;
+}
+.ticker .dot,
+.brand .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 8px var(--amber);
+}
+.ticker .sep {
+  color: var(--mute);
+  font-style: normal;
+}
+.keys {
+  height: 44px;
+  gap: 20px;
+  padding: 0 20px 0 12px;
+  color: var(--dim);
+  pointer-events: none;
+}
+.keys .k {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.keys kbd,
+.focus kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 24px;
+  padding: 0 4px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  background: var(--ink-0);
+  font: 11px/1 var(--mono);
+  letter-spacing: 0;
+  color: var(--paper);
+}
+.keys em {
+  font-style: normal;
+  margin-left: 8px;
+}
+.keys .hint b {
+  color: var(--amber);
+  font-weight: 400;
+}
+.keys .hint em {
+  margin-left: 4px;
+}
+
+/* the HUD glass: cockpit only, floating over the nose like Rive City's windscreen readouts */
+.glass {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: end;
+  gap: 32px;
+  width: min(720px, 86vw);
+  opacity: 0;
+  transition: opacity 200ms;
+  pointer-events: none;
+}
+.hud[data-view="cockpit"] .glass {
+  opacity: 1;
+}
+.glass b {
+  font: 300 40px/1 var(--sans);
+  font-stretch: 125%;
+  letter-spacing: 0.02em;
+  color: var(--paper);
+  text-shadow: 0 0 16px rgba(240, 235, 227, 0.35);
+}
+.glass small {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--amber);
+  margin-top: 4px;
+}
+.g-left {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  justify-self: end;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-2);
+}
+.g-turn {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px rgba(240, 169, 0, 0.6));
+}
+.g-left b {
+  font-size: 32px;
+}
+.g-mid {
+  position: relative;
+  text-align: center;
+}
+.g-mid b {
+  display: block;
+  font-size: 72px;
+  font-weight: 400;
+}
+.g-mid small {
+  color: var(--dim);
+}
+.g-rule {
+  display: block;
+  width: 24px;
+  height: 2px;
+  margin: 0 auto 8px;
+  background: var(--amber);
+}
+.g-right {
+  justify-self: start;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-2);
+}
+.g-right .g-mode {
+  font-size: 12px;
+  color: var(--paper);
+  margin: 0 0 4px;
+}
+.g-right b {
+  font-size: 28px;
+}
+
+/* AR tags: lock reticles on skiffs, corner brackets on screens */
+.tags {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.lock,
+.bracket {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  transition: opacity 200ms;
+  will-change: transform;
+}
+.lock.is-on,
+.bracket.is-on {
+  opacity: 1;
+}
+.lock svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px rgba(63, 227, 232, 0.6));
+  animation: spin 9s linear infinite;
+}
+.lock .r2 {
+  stroke-dasharray: 10 6;
+  opacity: 0.7;
+}
+.lock .tri {
+  fill: var(--cyan);
+  stroke: none;
+}
+.lock .core {
+  stroke: #ff3dbb;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.lock-tag {
+  position: absolute;
+  left: 100%;
+  top: -12px;
+  margin-left: 8px;
+  display: grid;
+  gap: 2px;
+  white-space: nowrap;
+}
+.lock-tag small {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--cyan);
+}
+.lock-tag b {
+  font: 500 16px/1 var(--sans);
+  font-stretch: 125%;
+  letter-spacing: 0.04em;
+  color: var(--paper);
+}
+.lock-tag span {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+}
+.br {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 0 solid var(--amber);
+  filter: drop-shadow(0 0 4px rgba(240, 169, 0, 0.55));
+}
+.br.tl {
+  left: 0;
+  top: 0;
+  border-left-width: 2px;
+  border-top-width: 2px;
+}
+.br.tr {
+  right: 0;
+  top: 0;
+  border-right-width: 2px;
+  border-top-width: 2px;
+}
+.br.bl {
+  left: 0;
+  bottom: 0;
+  border-left-width: 2px;
+  border-bottom-width: 2px;
+}
+.br.br2 {
+  right: 0;
+  bottom: 0;
+  border-right-width: 2px;
+  border-bottom-width: 2px;
+}
+.b-label {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 8px;
+  display: grid;
+  gap: 4px;
+  padding-left: 12px;
+  border-left: 1px solid var(--amber-line);
+  white-space: nowrap;
+}
+.b-label b {
+  font: 500 14px/1 var(--sans);
+  font-stretch: 125%;
+  letter-spacing: 0.12em;
+  color: var(--paper);
+}
+.b-label small {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--amber);
+}
+
+/* a screen, opened */
+.focus {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(10, 10, 11, 0.62);
+  opacity: 0;
+  transition: opacity 200ms;
+  pointer-events: auto;
+}
+.focus.is-open {
+  opacity: 1;
+}
+.focus[hidden] {
+  display: none;
+}
+.focus-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 32px;
+  align-items: end;
+  width: min(1080px, 100%);
+  transform: translateY(12px);
+  transition: transform 220ms var(--ease);
+}
+.focus.is-open .focus-card {
+  transform: none;
+}
+.focus-screen {
+  position: relative;
+  max-height: 72vh;
+  margin: 0 auto;
+  padding: 8px;
+}
+.focus-screen canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: calc(72vh - 16px);
+  object-fit: contain;
+  border-radius: var(--r-xs);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.focus-tag {
+  margin: 0 0 12px;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--amber);
+}
+.focus-name {
+  margin: 0 0 12px;
+  font: 600 32px/1.1 var(--sans);
+  font-stretch: 125%;
+  letter-spacing: 0.06em;
+}
+.focus-line {
+  margin: 0 0 24px;
+  font-size: 12px;
+  line-height: 1.6;
+  letter-spacing: 0.16em;
+  color: var(--dim);
+}
+.focus-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.focus .cta {
+  height: 40px;
+  padding: 0 24px;
+  border-radius: var(--r-pill);
+  background: var(--amber);
+  color: #14110a;
+  font: 600 12px/1 var(--sans);
+  letter-spacing: 0.2em;
+  transition: background-color 120ms;
+}
+.focus .cta:hover {
+  background: #ffbd1f;
+}
+.focus .close {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--pill);
+  box-shadow: var(--ring);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--dim);
+}
+
+/* small screens: the keycap bar goes, the ticker and pills tighten */
+@media (max-width: 860px), (pointer: coarse) {
+  .keys {
+    display: none;
+  }
+  .brand .sep,
+  .brand span:not(.clock) {
+    display: none;
+  }
+  .focus-card {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .glass b {
+    font-size: 28px;
+  }
+  .g-mid b {
+    font-size: 48px;
+  }
+}
+@media (max-width: 520px) {
+  .seg-label {
+    display: none;
+  }
+  .ticker {
+    font-size: 10px;
+    gap: 8px;
+    max-width: calc(100vw - 32px);
+    overflow: hidden;
+  }
+  .ticker .t-b,
+  .ticker .sep:nth-of-type(2) {
+    display: none;
+  }
+}
+
+/* ---- the title: an establishing shot with the product's one action ------------------------------------------- */
+.title {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 0 48px 56px;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 200ms, visibility 0s 200ms;
+}
+.hud[data-view="title"] .title {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 200ms;
+}
+.hud[data-view="title"] .hud-bottom,
+.hud[data-view="title"] .tags,
+.hud[data-view="title"] .glass {
+  opacity: 0;
+  visibility: hidden;
+}
+.hud-bottom,
+.tags {
+  transition: opacity 200ms;
+}
+.title-copy {
+  max-width: 520px;
+  pointer-events: auto;
+}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  color: var(--paper);
+}
+.eyebrow span {
+  color: var(--mute);
+}
+.eyebrow .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 8px var(--amber);
+}
+.title h1 {
+  margin: 0 0 16px;
+  font: 600 64px/0.95 "Tektur", var(--sans);
+  font-variation-settings: "wdth" 100;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  color: var(--paper);
+}
+.title h1 i.sp {
+  width: 0.34em;
+}
+/* クラーケン: the constructed wordmark, chrome with a split of pink and cyan at its edges */
+.wordmark {
+  margin: 0 0 14px -2px;
+  width: min(440px, 100%);
+}
+.wordmark .wm {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
+  filter: drop-shadow(2.5px 0 0 rgba(255, 45, 170, 0.75)) drop-shadow(-2.5px 0 0 rgba(60, 220, 255, 0.6)) drop-shadow(0 0 26px rgba(255, 61, 187, 0.35));
+}
+.wordmark .wm-g {
+  transform: translateY(118px);
+}
+.hud.is-intro .wordmark .wm-g {
+  transform: none;
+  transition: transform 1000ms cubic-bezier(0.16, 1, 0.3, 1) calc(220ms + var(--i) * 90ms);
+}
+/* now and then the word catches like a bad signal */
+.hud.is-intro .wordmark .wm {
+  animation: wm-glitch 7s steps(1) 2.6s infinite;
+}
+@keyframes wm-glitch {
+  0%,
+  96%,
+  100% {
+    transform: none;
+    clip-path: none;
+  }
+  96.6% {
+    transform: translateX(5px);
+    clip-path: inset(38% 0 44% 0);
+  }
+  97.2% {
+    transform: translateX(-4px);
+    clip-path: inset(62% 0 20% 0);
+  }
+  97.8% {
+    transform: translateX(2px);
+    clip-path: none;
+  }
+}
+.title h1 .ln {
+  display: block;
+}
+/* the big words: brushed chrome, a pink breath of neon under them */
+.title h1 .ln b {
+  background: linear-gradient(180deg, #ffffff 0%, #f3ece2 42%, #b9aeb8 78%, #e9dde6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 22px rgba(255, 61, 187, 0.32)) drop-shadow(0 2px 14px rgba(5, 4, 12, 0.7));
+}
+/* a line of technical labels: a tag, a crosshair, the moon in Japanese and in English */
+.title .jp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  font: 500 13px/1 "Noto Sans JP", sans-serif;
+  letter-spacing: 0.32em;
+  color: #ff8fcf;
+  text-shadow: 0 0 14px rgba(255, 61, 187, 0.6);
+}
+.title .jp .tag {
+  padding: 4px 6px 3px;
+  font: 11px/1 var(--mono);
+  letter-spacing: 0.12em;
+  color: var(--ink-0);
+  background: var(--amber);
+  text-shadow: none;
+  clip-path: polygon(0 0, 100% 0, 100% 70%, calc(100% - 4px) 100%, 0 100%);
+}
+.title .jp .xh {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: rgba(240, 235, 227, 0.7);
+  stroke-width: 1;
+}
+.title .jp .sep {
+  color: rgba(240, 235, 227, 0.35);
+}
+.title .jp .en {
+  font: 11px/1 var(--mono);
+  letter-spacing: 0.24em;
+  color: rgba(240, 235, 227, 0.62);
+  text-shadow: none;
+}
+/* each letter rises out of its own mask (Kage, Unseen) */
+.title h1 i {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  font-style: normal;
+  padding-bottom: 0.06em;
+}
+.title h1 i b {
+  display: inline-block;
+  font-weight: inherit;
+  transform: translateY(105%);
+}
+.hud.is-intro .title h1 i b {
+  transform: none;
+  transition: transform 1100ms cubic-bezier(0.16, 1, 0.3, 1) calc(300ms + var(--i) * 55ms);
+}
+.title .rv {
+  opacity: 0;
+  transform: translateY(14px);
+}
+.hud.is-intro .title .rv {
+  opacity: 1;
+  transform: none;
+  transition: opacity 900ms var(--ease) 700ms, transform 1100ms cubic-bezier(0.16, 1, 0.3, 1) 700ms;
+}
+.hud.is-intro .title .eyebrow.rv {
+  transition-delay: 150ms;
+}
+.hud.is-intro .title .title-actions.rv {
+  transition-delay: 1100ms;
+}
+.hud.is-intro .title .touch-hint.rv {
+  transition-delay: 1600ms;
+}
+/* a soft pool of shadow under the title so it reads over any part of the city */
+.title-copy {
+  position: relative;
+}
+.title-copy::before {
+  content: "";
+  position: absolute;
+  left: -120px;
+  right: -160px;
+  top: -80px;
+  bottom: -100px;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgba(5, 4, 12, 0.62), rgba(5, 4, 12, 0));
+  pointer-events: none;
+}
+.lede {
+  margin: 0 0 30px;
+  max-width: 400px;
+  font: 400 16px/1.55 var(--sans);
+  letter-spacing: 0.01em;
+  color: rgba(240, 235, 227, 0.78);
+  text-shadow: 0 1px 12px rgba(5, 4, 12, 0.8);
+}
+.title-actions {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+.title-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font: 11px/1 var(--mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(240, 235, 227, 0.6);
+}
+.title-note kbd {
+  display: inline-grid;
+  place-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(240, 235, 227, 0.22);
+  font: 10px/1 var(--mono);
+  letter-spacing: 0.12em;
+  color: rgba(240, 235, 227, 0.75);
+}
+.title-note .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3dffb0;
+  box-shadow: 0 0 8px #3dffb0;
+  animation: blink 1.6s ease-in-out infinite;
+}
+/* bottom right: the one interaction the home screen has besides boarding */
+.touch-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 6px;
+  font: 11px/1 var(--mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(240, 235, 227, 0.55);
+  pointer-events: none;
+}
+.touch-hint svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: rgba(240, 235, 227, 0.7);
+  stroke-width: 1;
+}
+.touch-hint circle:nth-child(2) {
+  animation: ripple 2.4s ease-out infinite;
+  transform-origin: 12px 12px;
+}
+.touch-hint circle:nth-child(3) {
+  animation: ripple 2.4s ease-out 0.5s infinite;
+  transform-origin: 12px 12px;
+}
+@keyframes ripple {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.05);
+  }
+}
+@keyframes blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* ---- buttons, in Kraken Port's own hand: a plate with two corners cut away, edged gold to red, a hanko seal, and a red
+   shoji that slides shut across it when the cursor arrives (the kumiko lattice shows through) ------------------------- */
+.aural {
+  --cut: 12px;
+  position: relative;
+  display: inline-flex !important;
+  align-items: stretch;
+  height: 56px;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: 0;
+  background:
+    linear-gradient(rgba(12, 9, 14, 0.94), rgba(12, 9, 14, 0.94)) padding-box,
+    linear-gradient(110deg, #ffcf6a, rgba(240, 235, 227, 0.2) 38%, rgba(240, 235, 227, 0.2) 64%, #ff2a4a) border-box !important;
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  color: var(--paper) !important;
+  font: 600 15px/1 "Tektur", var(--sans) !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase;
+  transition: transform 220ms var(--ease);
+}
+.aural::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #b30d27, #ff2a4a);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 460ms cubic-bezier(0.7, 0, 0.2, 1);
+}
+.aural::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, rgba(255, 236, 228, 0.16) 0 1px, transparent 1px 16px), repeating-linear-gradient(0deg, rgba(255, 236, 228, 0.12) 0 1px, transparent 1px 14px);
+  opacity: 0;
+  transition: opacity 300ms var(--ease);
+}
+.aural:hover::before,
+.aural:focus-visible::before {
+  transform: scaleX(1);
+}
+.aural:hover::after,
+.aural:focus-visible::after {
+  opacity: 1;
+  transition-delay: 200ms;
+}
+.aural:active {
+  transform: translateY(1px);
+}
+.aural:focus-visible {
+  outline: none;
+}
+.aural-seal {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-content: center;
+  width: 38px;
+  margin: 8px 0 8px 12px;
+  background: #e0102f;
+  color: #fff4f0;
+  font: 400 13px/1.06 "Dela Gothic One", "Noto Sans JP", sans-serif;
+  letter-spacing: 0;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 236, 228, 0.55), 0 0 18px rgba(255, 42, 74, 0.45);
+  transition: background 300ms var(--ease), color 300ms var(--ease);
+}
+.aural-seal b {
+  display: block;
+  font-weight: 400;
+  text-align: center;
+}
+.aural:hover .aural-seal,
+.aural:focus-visible .aural-seal {
+  background: #fff4f0;
+  color: #d10d2a;
+}
+.aural-t {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 22px 0 16px;
+}
+.aural-ar {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  border-left: 1px solid rgba(255, 207, 106, 0.28);
+}
+.aural-ar svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: #ffcf6a;
+  stroke-width: 1.6;
+  stroke-linecap: square;
+  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1), stroke 300ms var(--ease);
+}
+.aural:hover .aural-ar svg,
+.aural:focus-visible .aural-ar svg {
+  stroke: #fff4f0;
+  transform: translate(2px, -2px);
+}
+.glass {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 18px 0 8px !important;
+  border-radius: var(--r-xs);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 8px 24px -10px rgba(0, 0, 0, 0.6);
+  color: var(--paper) !important;
+  font: 400 12px/1 var(--mono) !important;
+  letter-spacing: 0.16em !important;
+  text-transform: uppercase;
+  transition: box-shadow 220ms var(--ease);
+}
+.glass:hover {
+  box-shadow: inset 0 0 0 1px rgba(217, 178, 106, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 8px 24px -10px rgba(0, 0, 0, 0.6);
+}
+
+/* ---- chapters: Kage's nav, numbered, the label rolls up to its twin on hover -------------------------------------------- */
+.chapters {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 6px;
+  border-radius: var(--r-xs);
+  box-shadow: var(--ring);
+  pointer-events: auto;
+}
+.chapters button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 12px 0 8px !important;
+  border-radius: var(--r-xs);
+  color: var(--dim) !important;
+  transition: color 120ms, background-color 120ms, box-shadow 120ms;
+}
+.chapters button + button::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--line);
+}
+.chapters .kj {
+  display: inline-grid;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  font: 400 14px/1 "Dela Gothic One", "Noto Sans JP", sans-serif;
+  font-style: normal;
+  color: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  transition: background-color 160ms, color 160ms, box-shadow 160ms;
+}
+.chapters button:hover .kj {
+  box-shadow: inset 0 0 0 1px var(--amber-line);
+}
+.chapters button.is-on .kj {
+  background: #e0102f;
+  color: #fff4f0;
+  box-shadow: inset 0 0 0 1px rgba(255, 236, 228, 0.5), 0 0 12px rgba(255, 42, 74, 0.5);
+}
+.chapters em {
+  font: 10px/1 var(--mono);
+  font-style: normal;
+  letter-spacing: 0.1em;
+  color: var(--amber);
+}
+.chapters span {
+  display: grid;
+  height: 14px;
+  overflow: hidden;
+  font: 500 11px/14px var(--sans);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.chapters span b {
+  font-weight: 500;
+  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.chapters span b + b {
+  color: var(--paper);
+}
+.chapters button:hover span b,
+.chapters button:focus-visible span b {
+  transform: translateY(-100%);
+}
+.chapters button.is-on {
+  color: var(--paper) !important;
+  background: rgba(255, 42, 74, 0.1);
+  box-shadow: inset 0 -2px 0 #ff2a4a;
+}
+.chapters button:focus-visible {
+  outline: 1px solid var(--amber);
+  outline-offset: 2px;
+}
+/* the port's name down the left edge in heavy white kanji on a slanted red bar, as Japanese cyberpunk posters hang it */
+.vkanji {
+  position: absolute;
+  left: 24px;
+  top: 88px;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: 0;
+  pointer-events: none;
+  transition: opacity 400ms;
+}
+.vkanji span {
+  padding: 16px 7px 20px;
+  writing-mode: vertical-rl;
+  font: 400 19px/1 "Dela Gothic One", "Noto Sans JP", sans-serif;
+  letter-spacing: 0.16em;
+  color: #fff6f2;
+  background: linear-gradient(180deg, #ff2a4a, #c4102c);
+  clip-path: polygon(0 10px, 100% 0, 100% calc(100% - 10px), 0 100%);
+  box-shadow: 0 0 24px rgba(255, 42, 74, 0.45);
+}
+.vkanji small {
+  font: 10px/1 var(--mono);
+  letter-spacing: 0.16em;
+  color: rgba(240, 235, 227, 0.6);
+}
+.hud:not([data-view="title"]) .vkanji {
+  opacity: 0;
+}
+/* arriving at a chapter */
+.arrive {
+  position: absolute;
+  top: 88px;
+  left: 50%;
+  transform: translate(-50%, -8px);
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  opacity: 0;
+  pointer-events: none;
+}
+.arrive small {
+  font: 10px/1 var(--mono);
+  letter-spacing: 0.3em;
+  color: var(--amber);
+}
+.arrive b {
+  font: 300 34px/1 var(--sans);
+  font-stretch: 125%;
+  letter-spacing: 0.12em;
+  color: var(--paper);
+  text-shadow: 0 0 24px rgba(255, 61, 187, 0.5), 0 2px 18px rgba(0, 0, 0, 0.6);
+}
+.arrive.is-on {
+  animation: arrive 3.6s var(--ease) both;
+}
+@keyframes arrive {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  12%,
+  78% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+}
+@media (max-width: 860px) {
+  .title {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-end;
+    gap: 24px;
+    padding: 0 16px 24px;
+  }
+  .title h1 {
+    font-size: 42px;
+  }
+  .wordmark {
+    width: min(300px, 78vw);
+  }
+  .touch-hint {
+    display: none;
+  }
+  .lede {
+    font-size: 14px;
+  }
+}
+
+/* ---- touch controls ------------------------------------------------------------------------------------------------- */
+.touch {
+  display: none;
+}
+.hud.is-touch .touch {
+  display: block;
+}
+.hud.is-touch .keys {
+  display: none;
+}
+.hud[data-view="title"] .touch {
+  display: none;
+}
+.stick {
+  position: absolute;
+  left: 24px;
+  bottom: 88px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: var(--pill);
+  box-shadow: var(--ring), inset 0 0 0 28px rgba(240, 235, 227, 0.03);
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  pointer-events: auto;
+}
+.stick span {
+  position: absolute;
+  bottom: -24px;
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  color: var(--mute);
+}
+.knob {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--amber-fill);
+  box-shadow: inset 0 0 0 1px var(--amber-line), 0 0 16px rgba(240, 169, 0, 0.25);
+  transition: transform 120ms;
+}
+.tbtns {
+  position: absolute;
+  right: 24px;
+  bottom: 96px;
+  display: grid;
+  gap: 12px;
+  pointer-events: auto;
+}
+.tbtns button {
+  width: 64px !important;
+  height: 64px;
+  border-radius: 50% !important;
+  background: var(--pill) !important;
+  box-shadow: var(--ring);
+  font-size: 10px !important;
+  letter-spacing: 0.18em !important;
+  color: var(--dim) !important;
+  touch-action: manipulation;
+}
+.tbtns button[aria-pressed="true"] {
+  color: var(--amber) !important;
+  box-shadow: inset 0 0 0 1px var(--amber-line);
+  background: var(--amber-fill) !important;
+}
+/* the glass readouts keep their edges against the bright canyon */
+.glass b,
+.glass small {
+  text-shadow: 0 0 2px rgba(5, 4, 12, 0.9), 0 0 12px rgba(5, 4, 12, 0.6);
+}
+@media (max-width: 520px) {
+  .hud-top {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+  }
+  .seg {
+    padding: 0 4px;
+    height: 36px;
+  }
+  .seg button {
+    padding: 0 10px;
+  }
+  .brand {
+    height: 36px;
+    padding: 0 6px 0 12px;
+  }
+  .brand .clock {
+    display: none;
+  }
+  .brand b {
+    font-size: 12px;
+    letter-spacing: 0.18em;
+  }
+  .snd {
+    width: 28px;
+    height: 28px;
+    padding: 6px !important;
+  }
+  .hud-bottom {
+    bottom: 12px;
+  }
+  .glass {
+    top: 40%;
+    gap: 16px;
+  }
+}
+.glass b {
+  white-space: nowrap;
+}
+@media (max-width: 520px) {
+  .glass {
+    grid-template-columns: auto auto auto;
+    width: auto;
+    gap: 20px;
+  }
+  .glass .g-place,
+  .glass .g-turn {
+    display: none;
+  }
+  .g-left b,
+  .g-right b {
+    font-size: 20px;
+  }
+  .g-mid b {
+    font-size: 44px;
+  }
+}
+
+/* ---- now playing: a short marquee beside the sound button ---------------------------------------------------- */
+.np {
+  display: none;
+  max-width: 200px;
+  overflow: hidden;
+  font: 10px/1 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--amber);
+  mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 16px), transparent);
+}
+.np.is-on {
+  display: block;
+}
+.np-t {
+  display: inline-block;
+  padding-left: 12px;
+  white-space: nowrap;
+  animation: np-roll 14s linear infinite;
+}
+@keyframes np-roll {
+  0%,
+  12% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+@media (max-width: 860px) {
+  .np {
+    display: none !important;
+  }
+}
+
+/* =====================================================================================================================
+   UI VARIATIONS (body[data-ui]): the same HUD in three hands. U cycles them; ?ui=rail|sys|noren picks one.
+   ===================================================================================================================== */
+.chapters .jpn {
+  display: none;
+}
+/* the English name stays with the button for screen readers even when a variation shows only kanji */
+.vh {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- NEON RAIL: one bar across the top, after the neon nav bars of the cyberpunk UI kits: chamfered ends, a glossy
+   magenta bevel, raised tabs over the brand and the mode switch (banded like HUD frames), a tab under the chapter you
+   are bound for, thin dividers between every item, the active one underlined. The frame is an SVG drawn to fit
+   (drawRail in hud.js) ------------------------------------------------------------------------------------------------- */
+body[data-ui="rail"] {
+  /* magenta (HIGH); every mode below recolours the bar, its buttons and its frame */
+  --neon: #ff3dbb;
+  --neon2: #8a5cff;
+  --rf-hi: #ffc2f2;
+  --rf-a: #ff55d6;
+  --rf-b: #b21fd8;
+  --rf-lo: #4c0f70;
+  --rf-p1: #34103f;
+  --rf-p2: #1a0724;
+  --rf-p3: #0e0416;
+  --rf-glow: 255, 61, 187;
+  --rf-glow2: 138, 92, 255;
+  --rf-ink: 246, 234, 246;
+}
+body[data-ui="rail"] {
+  --amber: #ff4fc4;
+  --amber-fill: rgba(255, 79, 196, 0.16);
+  --amber-line: rgba(255, 79, 196, 0.7);
+}
+body[data-ui="rail"] .hud-top {
+  top: 26px;
+  left: 50%;
+  right: auto;
+  width: max-content;
+  transform: translateX(-50%);
+  height: 48px;
+  padding: 0 34px;
+  gap: 0;
+  justify-content: center;
+}
+body[data-ui="rail"] .railframe {
+  display: block;
+  filter: drop-shadow(0 0 9px rgba(var(--rf-glow), 0.5)) drop-shadow(0 8px 20px rgba(0, 0, 0, 0.65));
+}
+body[data-ui="rail"] .hud-top > :not(.railframe) {
+  position: relative;
+  z-index: 1;
+}
+body[data-ui="rail"] .hud-top .pill {
+  height: 48px;
+  padding: 0 16px;
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+body[data-ui="rail"] .brand {
+  order: 1;
+  color: rgb(var(--rf-ink));
+}
+body[data-ui="rail"] .brand .mark {
+  stroke: var(--rf-a);
+}
+body[data-ui="rail"] .brand .mark circle {
+  fill: var(--rf-a);
+}
+body[data-ui="rail"] .brand .sep,
+body[data-ui="rail"] .brand > span:not(.clock):not(.np) {
+  display: none;
+}
+body[data-ui="rail"] .brand .clock {
+  color: rgba(var(--rf-ink), 0.6);
+}
+body[data-ui="rail"] .tablabel {
+  display: block;
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font: 500 9px/10px "Noto Sans JP", sans-serif;
+  font-style: normal;
+  letter-spacing: 0.3em;
+  color: rgb(var(--rf-ink));
+  white-space: nowrap;
+  padding-left: 40px;
+}
+body[data-ui="rail"] .snd {
+  border-radius: 0;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  box-shadow: inset 0 0 0 1px rgba(var(--rf-glow), 0.45);
+}
+body[data-ui="rail"] .chapters {
+  order: 2;
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  height: 48px;
+  padding: 0;
+  gap: 0;
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+body[data-ui="rail"] .chapters .kj {
+  display: none;
+}
+body[data-ui="rail"] .chapters button {
+  height: 48px;
+  padding: 0 18px !important;
+  border-radius: 0;
+  border-left: 1px solid rgba(var(--rf-ink), 0.15);
+}
+body[data-ui="rail"] .chapters button:last-child {
+  border-right: 1px solid rgba(var(--rf-ink), 0.15);
+}
+body[data-ui="rail"] .chapters button + button::before {
+  display: none;
+}
+body[data-ui="rail"] .chapters em {
+  color: var(--rf-a);
+}
+body[data-ui="rail"] .chapters span {
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  color: rgb(var(--rf-ink));
+}
+body[data-ui="rail"] .chapters button:hover span b {
+  text-shadow: 0 0 10px rgba(var(--rf-glow), 0.85);
+}
+body[data-ui="rail"] .chapters button.is-on {
+  color: #fff !important;
+  background: linear-gradient(180deg, rgba(var(--rf-glow), 0), rgba(var(--rf-glow), 0.2));
+  box-shadow: none;
+}
+body[data-ui="rail"] .chapters button.is-on::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 9px;
+  height: 2px;
+  background: var(--rf-a);
+  box-shadow: 0 0 10px var(--rf-a);
+}
+body[data-ui="rail"] .chapters button.is-on span b {
+  text-shadow: 0 0 12px rgba(var(--rf-glow), 0.95);
+}
+body[data-ui="rail"] .seg {
+  order: 3;
+}
+body[data-ui="rail"] .seg-label {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding-left: 46px;
+  font-size: 8px;
+  line-height: 10px;
+  letter-spacing: 0.34em;
+  color: rgb(var(--rf-ink));
+}
+body[data-ui="rail"] .seg button {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 0;
+  clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+  color: rgba(var(--rf-ink), 0.55);
+}
+body[data-ui="rail"] .seg button.is-on {
+  background: linear-gradient(90deg, rgba(var(--rf-glow), 0.45), rgba(var(--rf-glow2), 0.45));
+  box-shadow: none;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(var(--rf-glow), 0.9);
+}
+@media (max-width: 1320px) {
+  body[data-ui="rail"] .brand .clock {
+    display: none;
+  }
+  body[data-ui="rail"] .chapters button {
+    padding: 0 13px !important;
+  }
+}
+@media (max-width: 1160px) {
+  body[data-ui="rail"] .chapters span {
+    display: none;
+  }
+  body[data-ui="rail"] .chapters .kj {
+    display: inline-grid;
+    box-shadow: none;
+  }
+}
+body[data-ui="rail"] .aural {
+  height: 54px;
+  background:
+    linear-gradient(rgba(22, 6, 30, 0.92), rgba(22, 6, 30, 0.92)) padding-box,
+    linear-gradient(90deg, var(--neon), var(--neon2)) border-box !important;
+  text-shadow: 0 0 12px rgba(var(--rf-glow), 0.65);
+  filter: drop-shadow(0 0 14px rgba(var(--rf-glow), 0.35));
+}
+body[data-ui="rail"] .aural-seal {
+  display: none;
+}
+body[data-ui="rail"] .aural-t {
+  padding: 0 26px 0 28px;
+}
+body[data-ui="rail"] .aural::before {
+  background: linear-gradient(90deg, rgba(var(--rf-glow), 0.9), rgba(var(--rf-glow2), 0.9));
+}
+body[data-ui="rail"] .aural::after {
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.4) 50%, transparent 58%) 130% 0 / 260% 100% no-repeat;
+  opacity: 1;
+  transition: background-position 800ms var(--ease);
+}
+body[data-ui="rail"] .aural:hover::after,
+body[data-ui="rail"] .aural:focus-visible::after {
+  background-position: -30% 0;
+}
+body[data-ui="rail"] .aural-ar {
+  border-left-color: rgba(var(--rf-glow), 0.45);
+}
+body[data-ui="rail"] .aural-ar svg {
+  stroke: var(--neon);
+}
+body[data-ui="rail"] .hud-bottom .pill {
+  position: relative;
+  border-radius: 0;
+  box-shadow: none;
+  background: linear-gradient(180deg, var(--rf-hi), var(--rf-a) 22%, var(--rf-b) 60%, var(--rf-lo));
+  clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 14px 100%, 0 50%);
+  filter: drop-shadow(0 0 8px rgba(var(--rf-glow), 0.45));
+}
+body[data-ui="rail"] .hud-bottom .pill::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  background: linear-gradient(180deg, var(--rf-p1), var(--rf-p2) 50%, var(--rf-p3));
+  clip-path: polygon(13px 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 13px 100%, 0 50%);
+  pointer-events: none;
+}
+body[data-ui="rail"] .hud-bottom .pill > * {
+  position: relative;
+  z-index: 1;
+}
+body[data-ui="rail"] .keys {
+  padding: 0 28px;
+}
+body[data-ui="rail"] .keys kbd {
+  border-radius: 0;
+  clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+  box-shadow: none;
+  background: rgba(var(--rf-glow), 0.22);
+}
+
+/* ---- SYS TERMINAL: no plates, a mono command line across the top (brand left, links centre, mode right), [ BRACKET ]
+   buttons that fill on hover (after the terminal neon navs) ------------------------------------------------------------ */
+body[data-ui="sys"] {
+  --amber: #3dffb0;
+  --amber-fill: rgba(61, 255, 176, 0.12);
+  --amber-line: rgba(61, 255, 176, 0.6);
+}
+body[data-ui="sys"] .hud-top {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 58px;
+  padding: 0 28px;
+  flex-direction: row-reverse;
+  background: linear-gradient(180deg, rgba(3, 8, 7, 0.88), rgba(3, 8, 7, 0.5));
+  box-shadow: inset 0 -1px 0 var(--amber-line);
+}
+body[data-ui="sys"] .hud-top .pill,
+body[data-ui="sys"] .hud-bottom .pill {
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+  font-family: var(--mono);
+}
+body[data-ui="sys"] .brand .mark {
+  stroke: var(--amber);
+}
+body[data-ui="sys"] .brand b {
+  font: 15px/1 var(--mono);
+  letter-spacing: 0.1em;
+  color: var(--amber);
+  text-shadow: 0 0 10px var(--amber-line);
+}
+body[data-ui="sys"] .brand .sep {
+  font-size: 0;
+}
+body[data-ui="sys"] .brand .sep::before {
+  content: "//";
+  font-size: 12px;
+  color: var(--amber-line);
+}
+body[data-ui="sys"] .brand .clock::after {
+  content: "\25AE";
+  margin-left: 8px;
+  color: var(--amber);
+  animation: blink 1.1s steps(1) infinite;
+}
+body[data-ui="sys"] .snd {
+  border-radius: 0;
+}
+body[data-ui="sys"] .seg-label::after {
+  content: ":";
+}
+body[data-ui="sys"] .seg button {
+  height: 28px;
+  padding: 0 7px;
+  border-radius: 0;
+  background: none !important;
+  box-shadow: none !important;
+  font: 12px/1 var(--mono);
+  color: rgba(205, 255, 232, 0.42);
+}
+body[data-ui="sys"] .seg button.is-on {
+  color: var(--amber);
+  text-shadow: 0 0 10px var(--amber-line);
+}
+body[data-ui="sys"] .seg button.is-on::before {
+  content: "[";
+}
+body[data-ui="sys"] .seg button.is-on::after {
+  content: "]";
+}
+body[data-ui="sys"] .chapters {
+  top: 13px;
+  height: 32px;
+  gap: 4px;
+  background: none;
+  box-shadow: none;
+}
+body[data-ui="sys"] .chapters .kj,
+body[data-ui="sys"] .chapters span {
+  display: none;
+}
+body[data-ui="sys"] .chapters button {
+  height: 32px;
+  padding: 0 12px !important;
+  border-radius: 0;
+  font: 12px/1 var(--mono);
+  letter-spacing: 0.2em;
+  color: rgba(205, 255, 232, 0.55) !important;
+}
+body[data-ui="sys"] .chapters button + button::before {
+  display: none;
+}
+body[data-ui="sys"] .chapters em {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+body[data-ui="sys"] .chapters em::after {
+  content: ".";
+}
+body[data-ui="sys"] .chapters button::after {
+  content: attr(data-short);
+}
+body[data-ui="sys"] .chapters button:hover {
+  color: var(--amber) !important;
+}
+body[data-ui="sys"] .chapters button:hover em::before {
+  content: "> ";
+}
+body[data-ui="sys"] .chapters button.is-on {
+  color: var(--amber) !important;
+  background: var(--amber-fill);
+  box-shadow: inset 0 -2px 0 var(--amber);
+  text-shadow: 0 0 10px var(--amber-line);
+}
+body[data-ui="sys"] .aural {
+  --cut: 0px;
+  height: 52px;
+  border: 1px solid var(--amber) !important;
+  background: rgba(3, 10, 8, 0.72) !important;
+  font: 14px/1 var(--mono) !important;
+  letter-spacing: 0.24em !important;
+  color: var(--amber) !important;
+  text-shadow: 0 0 10px var(--amber-line);
+}
+body[data-ui="sys"] .aural-seal {
+  display: none;
+}
+body[data-ui="sys"] .aural-t {
+  padding: 0 22px;
+  transition: color 200ms;
+}
+body[data-ui="sys"] .aural-t::before {
+  content: "[ ";
+}
+body[data-ui="sys"] .aural-t::after {
+  content: " ]";
+}
+body[data-ui="sys"] .aural::before {
+  background: var(--amber);
+}
+body[data-ui="sys"] .aural::after {
+  display: none;
+}
+body[data-ui="sys"] .aural:hover .aural-t,
+body[data-ui="sys"] .aural:focus-visible .aural-t {
+  color: #021a10;
+  text-shadow: none;
+}
+body[data-ui="sys"] .aural-ar {
+  border-left: 1px solid var(--amber-line);
+}
+body[data-ui="sys"] .aural-ar svg {
+  stroke: var(--amber);
+}
+body[data-ui="sys"] .aural:hover .aural-ar svg,
+body[data-ui="sys"] .aural:focus-visible .aural-ar svg {
+  stroke: #021a10;
+}
+body[data-ui="sys"] .hud-bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px 28px 16px;
+  background: linear-gradient(0deg, rgba(3, 8, 7, 0.86), rgba(3, 8, 7, 0));
+}
+body[data-ui="sys"] .ticker {
+  color: var(--amber);
+}
+body[data-ui="sys"] .keys kbd {
+  border-radius: 0;
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--amber-line);
+  color: var(--amber);
+}
+
+/* ---- NOREN: Japanese signboards. The chapters hang from a brass rod as black lacquer boards: a big kanji, the name in
+   Japanese running down, the number at the foot; the one you are bound for is red lacquer and hangs lower. Plates are
+   lacquer with a gold hairline, the brand carries a red hanko -------------------------------------------------------- */
+body[data-ui="noren"] {
+  --gold: #d9a54a;
+  --lacquer: linear-gradient(180deg, #1c1311, #0b0707);
+}
+body[data-ui="noren"] .hud-top .pill,
+body[data-ui="noren"] .hud-bottom .pill {
+  background: var(--lacquer);
+  box-shadow: inset 0 0 0 1px rgba(217, 165, 74, 0.42), 0 10px 22px -10px rgba(0, 0, 0, 0.7);
+  border-radius: 2px;
+}
+body[data-ui="noren"] .seg button {
+  border-radius: 1px;
+}
+body[data-ui="noren"] .seg button.is-on {
+  color: #fff4ee;
+  background: linear-gradient(180deg, #e0102f, #a30a22);
+  box-shadow: inset 0 0 0 1px rgba(255, 214, 140, 0.7);
+}
+body[data-ui="noren"] .brand .mark {
+  display: none;
+}
+body[data-ui="noren"] .brand::before {
+  content: "\6E2F";
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 2px;
+  background: #d10d2a;
+  color: #fff4ee;
+  font: 400 14px/1 "Dela Gothic One", "Noto Sans JP", sans-serif;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 220, 160, 0.6);
+}
+body[data-ui="noren"] .chapters {
+  top: 0;
+  height: auto;
+  padding: 0 18px;
+  gap: 10px;
+  align-items: flex-start;
+  background: none;
+  box-shadow: none;
+}
+body[data-ui="noren"] .chapters::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 10px;
+  height: 5px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #f6dc98, #b07d2c 60%, #6e4a14);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.55);
+}
+body[data-ui="noren"] .chapters button {
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
+  width: 58px;
+  height: 132px;
+  margin-top: 19px;
+  padding: 16px 0 12px !important;
+  border-radius: 0 0 3px 3px;
+  background: var(--lacquer);
+  box-shadow: inset 0 0 0 1px rgba(217, 165, 74, 0.45), 0 14px 26px -12px rgba(0, 0, 0, 0.85);
+  color: #f6eee6 !important;
+  transform-origin: 50% -12px;
+  transition: transform 520ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms;
+}
+/* the two cords from the rod */
+body[data-ui="noren"] .chapters button + button::before,
+body[data-ui="noren"] .chapters button::after {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 14px;
+  right: 14px;
+  bottom: auto;
+  width: auto;
+  height: 10px;
+  background: none;
+  border-left: 2px solid rgba(240, 205, 130, 0.85);
+  border-right: 2px solid rgba(240, 205, 130, 0.85);
+}
+body[data-ui="noren"] .chapters button + button::before {
+  display: none;
+}
+body[data-ui="noren"] .chapters .kj {
+  width: auto;
+  height: auto;
+  background: none !important;
+  box-shadow: none !important;
+  font: 400 26px/1 "Dela Gothic One", "Noto Sans JP", sans-serif;
+  color: #fff4ee;
+}
+body[data-ui="noren"] .chapters .jpn {
+  display: block;
+  writing-mode: vertical-rl;
+  font: 500 12px/1 "Noto Sans JP", sans-serif;
+  font-style: normal;
+  letter-spacing: 0.26em;
+  color: var(--gold);
+}
+body[data-ui="noren"] .chapters em {
+  margin-top: auto;
+  font-size: 9px;
+  color: rgba(246, 238, 230, 0.5);
+}
+/* the English name: a small tag under the board, shown for the board you hover or are bound for */
+body[data-ui="noren"] .chapters span {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  height: auto;
+  padding: 4px 8px;
+  white-space: nowrap;
+  font: 10px/1 var(--mono);
+  letter-spacing: 0.18em;
+  color: #fff4ee;
+  background: rgba(10, 6, 6, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(217, 165, 74, 0.45);
+  opacity: 0;
+  transition: opacity 200ms;
+  pointer-events: none;
+}
+body[data-ui="noren"] .chapters span b + b {
+  display: none;
+}
+body[data-ui="noren"] .chapters button:hover span b,
+body[data-ui="noren"] .chapters button:focus-visible span b {
+  transform: none;
+}
+body[data-ui="noren"] .chapters button:hover span,
+body[data-ui="noren"] .chapters button:focus-visible span,
+body[data-ui="noren"] .chapters button.is-on span {
+  opacity: 1;
+}
+body[data-ui="noren"] .chapters button:hover {
+  transform: translateY(5px) rotate(-1.6deg);
+}
+body[data-ui="noren"] .chapters button.is-on {
+  background: linear-gradient(180deg, #e0102f, #9c0820);
+  box-shadow: inset 0 0 0 1px rgba(255, 214, 140, 0.85), 0 0 30px rgba(255, 42, 74, 0.45), 0 16px 26px -12px rgba(0, 0, 0, 0.85);
+  transform: translateY(12px);
+}
+body[data-ui="noren"] .chapters button.is-on .jpn {
+  color: #ffe2a4;
+}
+body[data-ui="noren"] .chapters button.is-on em {
+  color: rgba(255, 238, 220, 0.8);
+}
+body[data-ui="noren"] .keys kbd {
+  border-radius: 1px;
+  background: #120c0b;
+  box-shadow: inset 0 0 0 1px rgba(217, 165, 74, 0.55);
+  color: #f6e7c8;
+}
+
+/* ---- phones: the chapters move under the top bar, compact, in every variation ---------------------------------------- */
+@media (max-width: 860px) {
+  .chapters {
+    top: 62px;
+    left: 12px;
+    right: 12px;
+    transform: none;
+    justify-content: space-between;
+    padding: 0 4px;
+  }
+  .chapters span {
+    display: none;
+  }
+  .chapters button {
+    padding: 0 8px 0 6px !important;
+  }
+  body[data-ui="rail"] .hud-top {
+    top: 16px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    transform: none;
+    justify-content: space-between;
+    height: 44px;
+    padding: 0 20px;
+  }
+  body[data-ui="rail"] .hud-top .pill {
+    height: 44px;
+    padding: 0 6px;
+  }
+  body[data-ui="rail"] .hud-top .seg button {
+    padding: 0 7px;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+  }
+  body[data-ui="rail"] .tablabel,
+  body[data-ui="rail"] .seg-label {
+    display: none;
+  }
+  body[data-ui="rail"] .hud-top > .chapters {
+    position: absolute;
+    top: 58px;
+    left: 18px;
+    right: 18px;
+    height: 42px;
+    justify-content: space-between;
+    padding: 0 22px;
+    background: linear-gradient(90deg, var(--neon2), var(--neon) 50%, var(--neon2));
+    clip-path: polygon(0 0, 100% 0, calc(100% - 18px) 100%, 18px 100%);
+  }
+  body[data-ui="rail"] .chapters::before {
+    content: "";
+    position: absolute;
+    inset: 0 1.5px 1.5px;
+    background: linear-gradient(180deg, var(--rf-p1), var(--rf-p3));
+    clip-path: polygon(0 0, 100% 0, calc(100% - 17px) 100%, 17px 100%);
+  }
+  body[data-ui="rail"] .chapters button {
+    position: relative;
+    z-index: 1;
+    height: 40px;
+    padding: 0 6px !important;
+    border: 0;
+  }
+  body[data-ui="rail"] .chapters button:last-child {
+    border: 0;
+  }
+  body[data-ui="rail"] .chapters .kj {
+    display: inline-grid;
+    box-shadow: none;
+  }
+  body[data-ui="rail"] .chapters em::after {
+    content: none;
+  }
+  body[data-ui="sys"] .hud-top {
+    height: 52px;
+    padding: 0 14px;
+  }
+  body[data-ui="sys"] .chapters {
+    top: 58px;
+    justify-content: center;
+    gap: 0;
+  }
+  body[data-ui="sys"] .chapters button {
+    padding: 0 7px !important;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+  }
+  body[data-ui="noren"] .chapters {
+    top: 50px;
+    left: auto;
+    right: 12px;
+    gap: 6px;
+    padding: 0 8px;
+    justify-content: flex-end;
+  }
+  body[data-ui="noren"] .chapters::before {
+    top: 8px;
+  }
+  body[data-ui="noren"] .chapters button {
+    width: 40px;
+    height: 92px;
+    margin-top: 15px;
+    gap: 6px;
+    padding: 10px 0 8px !important;
+  }
+  body[data-ui="noren"] .chapters .kj {
+    font-size: 18px;
+  }
+  body[data-ui="noren"] .chapters .jpn {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+  }
+  body[data-ui="noren"] .chapters span {
+    display: block;
+  }
+}
+@media (max-width: 520px) {
+  .title .jp {
+    white-space: nowrap;
+  }
+  .title .jp .en,
+  .title .jp .sep {
+    display: none;
+  }
+}
+/* (fixes from the first look at the variations) */
+body[data-ui="sys"] .aural-t {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55em;
+}
+@media (max-width: 860px) {
+  .vkanji {
+    top: 120px;
+  }
+  body[data-ui="noren"] .vkanji {
+    top: 66px;
+  }
+  body[data-ui="rail"] .seg button {
+    padding: 0 8px;
+  }
+  body[data-ui="rail"] .brand b {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+  }
+  body[data-ui="sys"] .hud-top {
+    padding: 0 16px 0 18px;
+  }
+}
+
+/* (the header holds the mode switch, the chapters and the brand; it runs from the top edge, its padding placing them) */
+.hud-top {
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 16px 16px 0;
+  align-items: flex-start;
+}
+.railframe {
+  display: none;
+  position: absolute;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.tablabel {
+  display: none;
+}
+@media (max-width: 520px) {
+  .hud-top {
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 12px 0;
+  }
+}
+body[data-ui="rail"] .hud-top,
+body[data-ui="sys"] .hud-top {
+  align-items: center;
+}
+
+/* the recall from the far wards: the screen dips to black and a line reads while the shuttle is brought home */
+.hud::after {
+  content: "RECALLED TO THE GRAND CHANNEL";
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 12px/1 var(--mono);
+  letter-spacing: 0.4em;
+  color: var(--amber);
+  background: #050308;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 420ms var(--ease);
+  z-index: 40;
+}
+.hud.is-recall::after {
+  opacity: 1;
+}
+
+/* ---- the chapters speak English everywhere: the kanji tiles are gone from the bars, and where a bar is too narrow
+   for the full names it shows the short ones (VISION, CRAB, PAGODA, WARD) ---------------------------------------- */
+.chapters .kj,
+body[data-ui="rail"] .chapters .kj {
+  display: none !important;
+}
+.chapters .sh {
+  display: none;
+  font: 500 11px/1 var(--sans);
+  font-style: normal;
+  letter-spacing: 0.14em;
+  color: inherit;
+}
+@media (max-width: 1160px) {
+  body[data-ui="rail"] .chapters .sh {
+    display: inline;
+    color: rgb(var(--rf-ink));
+  }
+}
+@media (max-width: 860px) {
+  .chapters .sh,
+  body[data-ui="rail"] .chapters .sh {
+    display: inline;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+  body[data-ui="rail"] .chapters em {
+    display: none;
+  }
+}
+/* the signboard theme keeps its emblem kanji but always says where it goes, in English, down the board */
+body[data-ui="noren"] .chapters .kj {
+  display: block !important;
+}
+body[data-ui="noren"] .chapters .sh {
+  display: block;
+  writing-mode: vertical-rl;
+  font: 600 10px/1 var(--sans);
+  letter-spacing: 0.18em;
+  color: var(--gold);
+}
+body[data-ui="noren"] .chapters button.is-on .sh {
+  color: #ffe2a4;
+}
+body[data-ui="rail"] .tablabel {
+  font: 9px/10px var(--mono);
+  letter-spacing: 0.3em;
+}
+
+/* ---- guidance: the place you are bound for, marked in the world (or at the screen's edge, pointing the way) ---------- */
+.guide {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -14px 0 0 -14px;
+  pointer-events: none;
+  will-change: transform;
+}
+.guide .g-dia {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--amber);
+  transform: rotate(45deg);
+  box-shadow: 0 0 14px var(--amber-line), inset 0 0 10px var(--amber-fill);
+  animation: g-pulse 1.4s ease-in-out infinite;
+}
+.guide .g-arrow {
+  display: none;
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  width: 0;
+  height: 0;
+  border-left: 14px solid var(--amber);
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  transform: translate(-50%, -50%) rotate(var(--a, 0rad)) translateX(26px);
+  filter: drop-shadow(0 0 6px var(--amber));
+}
+.guide.is-edge .g-arrow {
+  display: block;
+}
+.guide span {
+  display: grid;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(10, 6, 16, 0.78);
+  box-shadow: inset 0 0 0 1px var(--amber-line);
+}
+.guide b {
+  font: 600 11px/1 var(--sans);
+  letter-spacing: 0.16em;
+  color: var(--paper);
+}
+.guide small {
+  font: 10px/1 var(--mono);
+  letter-spacing: 0.18em;
+  color: var(--amber);
+}
+@keyframes g-pulse {
+  50% {
+    box-shadow: 0 0 26px var(--amber), inset 0 0 14px var(--amber-fill);
+  }
+}
+
+/* the song playing hangs under the bar instead of widening it, so the bar never moves */
+body[data-ui="rail"] .np {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 22px;
+  max-width: 300px;
+  padding: 5px 10px;
+  background: rgba(10, 4, 16, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(var(--rf-glow), 0.45);
+}
+
+/* ---- the song: YouTube's own player, small and visible in a frame of the bar's neon ----------------------------------- */
+.ytmini {
+  position: fixed;
+  right: 18px;
+  bottom: 120px;
+  z-index: 30;
+  width: 240px;
+  padding: 0 0 6px;
+  background: rgba(14, 5, 22, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(255, 85, 214, 0.7), 0 0 22px rgba(255, 61, 187, 0.35), 0 12px 30px rgba(0, 0, 0, 0.6);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition: opacity 220ms var(--ease), transform 220ms var(--ease), visibility 0s 220ms;
+}
+.ytmini.is-on {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 220ms var(--ease), transform 220ms var(--ease);
+}
+.ytmini .yt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px 7px;
+  font: 9px/1.3 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ffd6f6;
+}
+.ytmini .yt-head i {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff55d6;
+  box-shadow: 0 0 8px #ff55d6;
+  animation: blink 1.4s ease-in-out infinite;
+}
+.ytmini #yt-player,
+.ytmini iframe {
+  display: block;
+  width: 228px;
+  height: 200px;
+  margin: 0 6px;
+  border: 0;
+}
+@media (max-width: 860px) {
+  .ytmini {
+    top: 112px;
+    bottom: auto;
+    right: 10px;
+    width: 220px;
+  }
+  .ytmini #yt-player,
+  .ytmini iframe {
+    width: 208px;
+  }
+}
