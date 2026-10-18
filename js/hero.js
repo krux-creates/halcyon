@@ -7,7 +7,7 @@ import * as THREE from "three";
 import {
   vec2, vec3, float, mix, step, smoothstep, abs, fract, floor, sin, cos, length, max, min, pow, positionGeometry,
   normalGeometry, positionWorld, positionLocal, cameraPosition, normalize, uv, attribute, select, texture, screenUV,
-  instancedBufferAttribute, normalView, positionViewDirection, dot, cross, mx_noise_float, hash as rawHash, clamp,
+  instancedBufferAttribute, normalView, positionViewDirection, dot, cross, mx_noise_float, hash as rawHash, clamp, normalWorld,
 } from "three/tsl";
 import { PORT } from "./port.js";
 import { NEON, pagoda } from "./japan.js";
@@ -405,6 +405,9 @@ function buildHighway(U, pts) {
     const stain = mx_noise_float(vec3(positionWorld.x.mul(0.08), positionWorld.y.mul(0.5), positionWorld.z.mul(0.08))).mul(0.5).add(0.5);
     const joint = step(0.97, fract(uv().x.div(15.0)));
     deckMat.colorNode = mix(vec3(0.2, 0.19, 0.18), vec3(0.075, 0.07, 0.075), U.night).mul(stain.mul(0.4).add(0.7)).mul(float(1.0).sub(joint.mul(0.5)));
+    // by day the bright street throws light back up under the deck, so its underside reads as concrete, not a black slab
+    const under = smoothstep(-0.2, -0.8, normalWorld.y);
+    deckMat.emissiveNode = U.hazeBright.mul(0.09).mul(under).mul(stain.mul(0.3).add(0.7)).mul(float(1.0).sub(U.night));
   }
   group.add(new THREE.Mesh(deck, deckMat));
   // neon edges and the traffic on top: thin ribbons
@@ -436,8 +439,12 @@ function buildHighway(U, pts) {
   };
   const edgeL = new THREE.Mesh(ribbon(-W / 2, 0.6, 0.95), neon([0.25, 0.75, 1.0]));
   const edgeR = new THREE.Mesh(ribbon(W / 2, 0.6, 0.95), neon([1.0, 0.2, 0.7]));
-  const under = new THREE.Mesh(ribbon(0, W * 0.9, -T - 0.05), neon([1.0, 0.16, 0.6]));
-  under.material.colorNode = vec3(1.0, 0.16, 0.6).mul(smoothstep(0.0, 0.08, uv().y).mul(smoothstep(1.0, 0.92, uv().y))).mul(0.0).add(vec3(1.0, 0.16, 0.6).mul(step(abs(uv().y.sub(0.5)), 0.04)).mul(mix(float(0.5), float(2.0), U.night)));
+  // the magenta line down the middle of the underside: only the line glows (an opaque strip here hid the whole deck
+  // under a black sheet)
+  const underMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  underMat.colorNode = vec3(1.0, 0.16, 0.6).mul(step(abs(uv().y.sub(0.5)), 0.04)).mul(mix(float(0.5), float(2.0), U.night)).mul(float(1.0).sub(U.fogFactor().mul(0.45)));
+  underMat.fog = false;
+  const under = new THREE.Mesh(ribbon(0, W * 0.9, -T - 0.05), underMat);
   group.add(edgeL, edgeR, under);
   // traffic as a long exposure: warm white heads streaming one way, red tails the other, each car a pair of threads of
   // light drawn out a hundred metres, the way a night road photographs
