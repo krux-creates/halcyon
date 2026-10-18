@@ -1,5 +1,6 @@
 // HALCYON: boots the WebGPU renderer (Three.js falls back to WebGL2 by itself), builds Kraken Port and runs the
-// frame through a node post chain: bloom, then a film grade.
+// frame through a node post chain: bloom, then a film grade. The city is flown the way Rive City's is: hovering over
+// the avenues, a sky lane above, day or night, with the wind carrying dust and sparks through the air.
 // Dev params: ?day  ?rain  ?view=chase|cockpit|show  ?auto  ?cam=channel|deep|aerial|water|mouth|dome|mugen  ?campos=x,y,z&look=x,y,z
 //             ?q=high|med|low  ?gov0 (no resolution governor)  ?t=<seconds>  ?still
 import * as THREE from "three";
@@ -14,6 +15,9 @@ import { createHud } from "./hud.js";
 import { createHero } from "./hero.js";
 import { createLoader } from "./loader.js";
 import { createMusic } from "./music.js";
+import { createRouteLine } from "./routeline.js";
+import { createWind } from "./wind.js";
+import { createTrails } from "./trails.js";
 
 const params = new URLSearchParams(location.search);
 window.__t0 = performance.now();
@@ -57,16 +61,24 @@ const traffic = createTraffic(port.U, quality);
 port.scene.add(traffic.group);
 // the harbour mouth: the boardwalk, the koi, the oni, the expressway (the home screen's set)
 const hero = createHero(port.U, { water: port.water, camera });
+const routeLine = createRouteLine(port.U);
+port.scene.add(routeLine.mesh);
+const wind = createWind(port.U, { count: Math.round(3600 * (quality.particles ?? 1)) });
+port.scene.add(wind.group);
 window.__tHero = performance.now();
 port.scene.add(hero.group);
 for (const s of hero.solids) port.plan.platforms.push({ ...s, side: 0, row: -1, seed: 0 });
 // the wet boardwalk mirrors the scene, so it stays out of the mirror's own render (layer 1)
 camera.layers.enable(1);
 port.water.reflection.reflector.getVirtualCamera(camera).layers.disable(1);
-// the shuttle, afloat at the harbour mouth, nose up the channel
+// the shuttle, parked on the Grand Avenue by the torii, nose up the avenue
 const shuttle = createShuttle();
 port.scene.add(shuttle.group);
 shuttle.setNight(port.U.night.value);
+// heat trails behind the engines, stretching with speed
+port.U.speed = uniform(0);
+const trails = createTrails(port.U, { engines: shuttle.engines, widths: shuttle.engineWidths });
+port.scene.add(trails.mesh);
 // the city's neon spill on the hull: a warm key from the front-left, a magenta rim from behind
 {
   const key = new THREE.PointLight(0xfff0e0, 1500, 90, 2);
@@ -90,18 +102,10 @@ const hud = createHud({
   port,
   traffic,
   camera,
-  quality: qualityKey,
-  onQuality(q) {
-    qualityKey = q;
-    quality = QUALITY[q];
-    try {
-      localStorage.setItem("halcyon-quality", q);
-    } catch {}
-    gov.level = 0;
-    resize();
-  },
   onSound: (on) => music.toggle(on),
-  onNight: () => (nightTarget = 1 - nightTarget),
+  // DAY | NIGHT in the rail, and N: the city eases from one to the other
+  onTime: (n) => (nightTarget = n),
+  getNight: () => nightTarget,
 });
 
 // ---- fixed views for checking the world ----------------------------------------------------------------
@@ -162,7 +166,8 @@ const bloomIn = Fn(() => {
   const finite = c.x.equal(c.x).and(c.y.equal(c.y)).and(c.z.equal(c.z));
   return vec4(select(finite, min(c, vec3(24.0)), vec3(0.0)), 1.0);
 })();
-const bloomNode = bloom(bloomIn, 0.55, 0.45, 0.82);
+// (held back: neon should glow, not wash the frame white)
+const bloomNode = bloom(bloomIn, 0.36, 0.38, 0.9);
 function outputFor(withBloom) {
   return Fn(() => {
     const d = screenUV.sub(0.5);
@@ -229,25 +234,7 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
-// the home screen's water: the simulation sits round the boardwalk, and the cursor trails ripples across it
-const TITLE_WATER = { x: 0, z: 872 };
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-{
-  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), hit = new THREE.Vector3();
-  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-  let last = null;
-  canvas.addEventListener("pointermove", (e) => {
-    if (flight.state.view !== "title") return;
-    ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
-    ray.setFromCamera(ndc, camera);
-    if (!ray.ray.intersectPlane(plane, hit)) return;
-    if (Math.abs(hit.x - TITLE_WATER.x) > 50 || Math.abs(hit.z - TITLE_WATER.z) > 50) return;
-    if (hit.x > -9.5 && hit.x < 9.5) return; // under the boardwalk
-    if (last && last.distanceTo(hit) < 0.9) return;
-    port.water.touch(hit.x, hit.z, last ? Math.min(1.4, last.distanceTo(hit) / 2) : 1);
-    last = (last ?? new THREE.Vector3()).copy(hit);
-  });
-}
 // build every shader before the first frame, so the scene never hitches as new things come into view
 await loader.breathe(0.82);
 // (renderer.compileAsync blanks the post pass on three r170, so the first frames compile behind the loader instead)
@@ -288,7 +275,12 @@ renderer.setAnimationLoop(() => {
   const dt = still ? 0 : Math.min(0.05, raw);
   time += dt;
   flight.update(time, dt);
-  shuttle.group.visible = flight.state.view !== "title";
+  // (from the cockpit the hull is not drawn: the cockpit frame is, and nothing of the outside cuts into the view)
+  shuttle.group.visible = flight.state.view !== "title" && flight.state.view !== "cockpit";
+  trails.mesh.visible = shuttle.group.visible;
+  shuttle.group.updateMatrixWorld(true);
+  trails.update(shuttle.group);
+  port.U.speed.value += (Math.min(1, Math.abs(flight.state.speed) / 50) - port.U.speed.value) * Math.min(1, dt * 3);
   // day and night ease into each other
   if (Math.abs(nightTarget - nightMix) > 0.001) {
     nightMix += Math.sign(nightTarget - nightMix) * Math.min(Math.abs(nightTarget - nightMix), dt * 0.6);
@@ -297,14 +289,18 @@ renderer.setAnimationLoop(() => {
   }
   for (const [l, day, night] of [[shuttle.lights.key, 300, 1500], [shuttle.lights.rim, 80, 380], [shuttle.lights.fill, 60, 260]]) l.intensity = day + (night - day) * nightMix;
   port.update(time, dt, camera);
-  // the water feels the shuttle and the boats near it
-  {
-    const s = flight.state;
-    const onTitle = s.view === "title";
-    port.water.update(time, dt, { pos: s.pos, yaw: s.yaw, vF: s.speed, vL: s.slip, alt: s.alt, throttle: s.throttle, skim: s.skim, heave: s.heave }, [], onTitle ? TITLE_WATER : null);
-  }
+  // the street keeps under the camera
+  port.water.update(time, dt, null, [], null, camera);
   hero.update(time, camera);
   air.update(time, dt);
+  wind.update(time);
+  // the guidance line: the trip's route laid out ahead in the air, a little under the shuttle
+  if (time - routeLine.at > 0.12) {
+    routeLine.at = time;
+    const ahead = flight.state.view !== "title" ? flight.routeAhead() : null;
+    if (ahead?.length) routeLine.set([{ x: flight.state.pos.x, z: flight.state.pos.z }, ...ahead], Math.max(1.2, flight.state.pos.y - 5));
+    else routeLine.hide();
+  }
   uRain.value = air.rain.value;
   uPulse.value = reduceMotion ? 0 : flight.state.gatePulse ?? 0;
   renderer.toneMappingExposure = port.exposure;

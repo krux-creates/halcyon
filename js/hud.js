@@ -1,8 +1,8 @@
 // HALCYON's HUD, in the language extracted from Rive City (DESIGN-LANGUAGE.md §3): near-black pills with a hairline
-// ring, a thin tracked mono label voice, a wide display voice for numbers, one amber accent. A segmented quality
-// pill, a ticker that names where you are and the one thing to do, a keycap bar, lock reticles and tags on the
-// skiffs, corner brackets on the screen you are nearest, screens that open when clicked, and the HUD glass that
-// floats over the cockpit.
+// ring, a thin tracked mono label voice, a wide display voice for numbers, one accent. A day/night switch in the rail,
+// a ticker that names the street you are on and the one thing to do, a keycap bar, a turn-by-turn chip on a trip (the
+// way a driving game shows the next turn), lock reticles and tags on the traffic, corner brackets on the screen you
+// are nearest, screens that open when clicked, and in the cockpit the frame, the dash and the HUD glass over the nose.
 import * as THREE from "three";
 import { KINDS, compositeCanvas } from "./billboards.js";
 import { PORT } from "./port.js";
@@ -13,7 +13,23 @@ import { columnOf, spanOf } from "./world.js";
 const inWards = (x, z) => Math.abs(x) > HOME.X - 20 || z < HOME.Z;
 const wardName = (x, z) => `MUGEN WARD ${String.fromCharCode(65 + (((columnOf(x) + 13) % 26) + 26) % 26)}-${Math.abs(spanOf(z))}`;
 
-const CANALS = ["HIKARI CANAL", "KOI CANAL", "SHIMA CANAL", "YORU CANAL"];
+const STREETS = ["HIKARI ST", "KOI ST", "SHIMA ST", "YORU ST"];
+
+// the turn-by-turn glyphs (drawn turning right; mirrored for left)
+const TURN = {
+  ahead: "M12 21V5M6.5 10.5 12 5l5.5 5.5",
+  bear: "M8 21v-7l8-8M10 6h6v6",
+  turn: "M6 21V11h12M14 7l4 4-4 4",
+  back: "M7 21V9.5a5 5 0 0 1 10 0V15M13 11.5l4 4 4-4",
+};
+/** Which glyph and words for a heading change of ang radians (positive is to the right). */
+function maneuver(ang) {
+  const deg = Math.abs((ang * 180) / Math.PI), side = ang < 0 ? "LEFT" : "RIGHT";
+  if (deg < 18) return { k: "ahead", left: false, words: "STRAIGHT ON" };
+  if (deg < 62) return { k: "bear", left: ang < 0, words: `BEAR ${side}` };
+  if (deg < 140) return { k: "turn", left: ang < 0, words: `TURN ${side}` };
+  return { k: "back", left: ang < 0, words: "TURN AROUND" };
+}
 
 // クラーケン, built from straight cuts the way Japanese cyberpunk logotypes are: one stroke weight, hard diagonals, a
 // stencil gap run through the whole word. Each glyph sits in a 100 x 112 box, 96 apart.
@@ -32,7 +48,7 @@ const wordmarkSVG = () => `<svg class="wm" viewBox="0 0 484 112" aria-hidden="tr
   <g fill="url(#wmChrome)" mask="url(#wmCut)">${WORDMARK.map((g, i) => `<g transform="translate(${i * 96} 0)"><g class="wm-g" style="--i:${i}">${g.map((pts) => `<polygon points="${pts}"/>`).join("")}</g></g>`).join("")}</g>
 </svg>`;
 
-export function createHud({ flight, port, traffic, camera, onQuality, onNight, onSound, quality = "high" }) {
+export function createHud({ flight, port, traffic, camera, onTime, getNight, onSound }) {
   const root = document.getElementById("ui");
   root.innerHTML = `
   <div class="hud" data-view="chase">
@@ -44,6 +60,7 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
         <button type="button" data-ch="2" data-short="PAGODA"><i class="kj" aria-hidden="true" lang="ja">塔</i><i class="sh" aria-hidden="true">PAGODA</i><em>03</em><span><b>Tenryū Pagoda</b><b aria-hidden="true">Tenryū Pagoda</b></span></button>
         <button type="button" data-ch="3" data-short="WARD"><i class="kj" aria-hidden="true" lang="ja">区</i><i class="sh" aria-hidden="true">WARD</i><em>04</em><span><b>Mugen Ward</b><b aria-hidden="true">Mugen Ward</b></span></button>
       </nav>
+      <div class="pill seg" role="group" aria-label="Time of day"><span class="seg-label">TIME</span><button type="button" data-t="0" aria-pressed="false">DAY</button><button type="button" data-t="1" aria-pressed="false">NIGHT</button></div>
       <div class="pill brand">
         <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15c3-5 6-7 9-7s6 2 9 7" /><path d="M7 15c1.6-2.4 3.3-3.6 5-3.6S15.4 12.6 17 15" /><circle cx="12" cy="17.4" r="1.4" /></svg>
         <b>HALCYON</b><span class="sep">·</span><span>KRAKEN PORT</span><span class="sep">·</span><span class="clock">22:41</span>
@@ -53,26 +70,51 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
       </div>
     </header>
 
+    <div class="cockpit" aria-hidden="true">
+      <svg class="ck-frame" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMax slice">
+        <defs>
+          <linearGradient id="ckDash" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a1420"/><stop offset="0.18" stop-color="#0b0910"/><stop offset="1" stop-color="#050408"/></linearGradient>
+          <linearGradient id="ckPillar" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#050408"/><stop offset="0.75" stop-color="#120e18"/><stop offset="1" stop-color="#1d1626"/></linearGradient>
+          <linearGradient id="ckPillarR" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#050408"/><stop offset="0.75" stop-color="#120e18"/><stop offset="1" stop-color="#1d1626"/></linearGradient>
+        </defs>
+        <path class="ck-roof" d="M0 0H1440V34C1180 58 960 64 720 64S260 58 0 34Z" />
+        <path class="ck-pillar" d="M24 34H156L500 594 440 614Z" fill="url(#ckPillar)" />
+        <path class="ck-pillar" d="M1416 34H1284L940 594 1000 614Z" fill="url(#ckPillarR)" />
+        <path class="ck-door" d="M0 560 446 612 0 650Z" />
+        <path class="ck-door" d="M1440 560 994 612 1440 650Z" />
+        <path class="ck-sill" d="M0 560 446 612M1440 560 994 612" />
+        <path class="ck-dash" d="M0 640C220 606 420 590 540 586L600 584C640 583 680 582 720 582S800 583 840 584L900 586C1020 590 1220 606 1440 640V900H0Z" fill="url(#ckDash)" />
+        <path class="ck-edge" d="M0 640C220 606 420 590 540 586L600 584C640 583 680 582 720 582S800 583 840 584L900 586C1020 590 1220 606 1440 640" />
+        <path class="ck-hood" d="M470 612C560 600 640 596 720 596S880 600 970 612" />
+      </svg>
+      <div class="dash">
+        <div class="d-cell d-l"><small>// CHARGE</small><b class="d-charge">86<i>%</i></b><span class="d-bar"><i></i></span></div>
+        <div class="d-cell d-m"><small>// DRIVE MODE</small><b class="d-mode">HOVER</b><span class="d-gear"><i>P</i><i>R</i><i>N</i><i class="is-on">D</i></span></div>
+        <div class="d-cell d-r"><svg class="d-turn" viewBox="0 0 24 24"><path d="${TURN.ahead}" /></svg><div><b class="d-dist">—</b><small class="d-what">FREE FLIGHT</small></div></div>
+      </div>
+    </div>
+
     <div class="glass" aria-hidden="true">
       <div class="g-left">
-        <svg class="g-turn" viewBox="0 0 24 24"><path d="M5 20V11h11" /><path d="M12 7l4 4-4 4" /></svg>
-        <div><b class="g-dist">—</b><small class="g-place">GRAND CHANNEL</small></div>
+        <svg class="g-turn" viewBox="0 0 24 24"><path d="${TURN.turn}" /></svg>
+        <div><b class="g-dist">—</b><small class="g-place">GRAND AVENUE</small></div>
       </div>
       <div class="g-mid"><span class="g-rule"></span><b class="g-speed">0</b><small>KM/H</small></div>
-      <div class="g-right"><small class="g-mode">TAXI</small><b class="g-alt">1.1</b><small>M ALT</small></div>
+      <div class="g-right"><small class="g-mode">HOVER</small><b class="g-alt">12.0</b><small>M ALT</small></div>
     </div>
 
     <div class="tags" aria-hidden="true"></div>
     <div class="guide" aria-hidden="true" hidden><i class="g-dia"></i><i class="g-arrow"></i><span><b class="gd-name"></b><small class="gd-dist"></small></span></div>
+    <div class="navarrow" hidden aria-live="polite"><svg class="na-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${TURN.ahead}" /></svg><p><b class="na-dist">—</b><small class="na-turn">STRAIGHT ON</small></p><span class="na-to"></span></div>
 
     <footer class="hud-bottom">
-      <div class="navarrow" hidden aria-live="polite"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 3 42 42 24 32 6 42Z" /></svg><p><b class="na-turn">AHEAD</b><span class="na-to"></span></p></div>
       <div class="pill ticker" role="status">
-        <i class="dot"></i><span class="t-a">GRAND CHANNEL</span><i class="sep">·</i><span class="t-b">0 KM/H</span><i class="sep">·</i><span class="t-c">W TO TAXI</span>
+        <i class="dot"></i><span class="t-a">GRAND AVENUE</span><i class="sep">·</i><span class="t-b">0 KM/H</span><i class="sep">·</i><span class="t-c">W TO FLY</span>
       </div>
       <div class="pill keys">
         <span class="k"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><em>DRIVE</em></span>
-        <span class="k"><kbd>F</kbd><em>SKIM</em></span>
+        <span class="k"><kbd>E</kbd><kbd>Q</kbd><em>UP/DOWN</em></span>
+        <span class="k"><kbd>F</kbd><em>SKY LANE</em></span>
         <span class="k"><kbd>P</kbd><em>AUTOPILOT</em></span>
         <span class="k"><kbd>C</kbd><em>CAMERA</em></span>
         <span class="k"><kbd>N</kbd><em>DAY/NIGHT</em></span>
@@ -91,20 +133,22 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
           <span class="ln">KRAKEN PORT</span>
         </h1>
         <p class="jp rv" lang="ja"><span class="tag">+07</span><svg class="xh" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0v12M0 6h12" /><circle cx="6" cy="6" r="3" /></svg>土星の月 タイタン <span class="sep">/</span> <span class="en">SATURN VI · 52°N</span></p>
-        <p class="lede rv" data-text="A floating city on Titan's methane sea. Step through the gate and fly the canals.">A floating city on Titan's methane sea. Step through the gate and fly the canals.</p>
+        <p class="lede rv" data-text="A city of neon towers under Titan's haze. Step through the gate and fly its avenues.">A city of neon towers under Titan's haze. Step through the gate and fly its avenues.</p>
         <div class="title-actions rv">
           <button type="button" class="board aural"><span class="aural-seal" aria-hidden="true" lang="ja"><b>搭</b><b>乗</b></span><span class="aural-t">Board HL-07</span><span class="aural-ar" aria-hidden="true"><svg viewBox="0 0 14 14"><path d="M3 11 11 3M5 3h6v6" /></svg></span></button>
           <p class="title-note"><i class="dot"></i><span>Gate 3 · boarding now</span><kbd>Enter</kbd></p>
         </div>
       </div>
-      <p class="touch-hint rv" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="11" /></svg><span>Move across the water</span></p>
+      <p class="touch-hint rv" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="11" /></svg><span>Fly the avenues</span></p>
     </section>
     <div class="arrive" role="status" aria-live="polite"><small>ARRIVED</small><b></b></div>
 
     <div class="touch">
       <div class="stick" aria-label="Drive: drag up to go, left and right to steer"><i class="knob"></i><span>DRIVE</span></div>
       <div class="tbtns">
-        <button type="button" data-act="skim" aria-pressed="false">SKIM</button>
+        <button type="button" data-act="up" aria-label="Climb">UP</button>
+        <button type="button" data-act="down" aria-label="Sink">DN</button>
+        <button type="button" data-act="skim" aria-pressed="false">SKY</button>
         <button type="button" data-act="auto" aria-pressed="false">AUTO</button>
         <button type="button" data-act="cam">CAM</button>
       </div>
@@ -117,7 +161,7 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
           <p class="focus-tag">// SCREEN</p>
           <h2 class="focus-name">—</h2>
           <p class="focus-line">—</p>
-          <div class="focus-actions"><button type="button" class="cta aural"><span class="aural-t">Open</span><span class="aural-ar" aria-hidden="true"><svg viewBox="0 0 14 14"><path d="M3 11 11 3M5 3h6v6" /></svg></span></button><button type="button" class="close glass"><kbd>ESC</kbd><span>Back to the channel</span></button></div>
+          <div class="focus-actions"><button type="button" class="cta aural"><span class="aural-t">Open</span><span class="aural-ar" aria-hidden="true"><svg viewBox="0 0 14 14"><path d="M3 11 11 3M5 3h6v6" /></svg></span></button><button type="button" class="close glassbtn"><kbd>ESC</kbd><span>Back to the avenue</span></button></div>
         </div>
       </div>
     </section>
@@ -127,19 +171,19 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
   const tags = $(".tags");
   const glassEl = $(".glass");
 
-  // ---- quality, music ----------------------------------------------------------------------------------------
-  const setQualityUI = (q) =>
+  // ---- the time of day: DAY | NIGHT (N toggles it too) -------------------------------------------------------
+  let shownNight = null;
+  const setTimeUI = (n) => {
+    if (n === shownNight) return;
+    shownNight = n;
     root.querySelectorAll(".seg button").forEach((o) => {
-      o.classList.toggle("is-on", o.dataset.q === q);
-      o.setAttribute("aria-pressed", String(o.dataset.q === q));
+      const on = +o.dataset.t === n;
+      o.classList.toggle("is-on", on);
+      o.setAttribute("aria-pressed", String(on));
     });
-  root.querySelectorAll(".seg button").forEach((b) =>
-    b.addEventListener("click", () => {
-      setQualityUI(b.dataset.q);
-      onQuality?.(b.dataset.q);
-    }),
-  );
-  setQualityUI(quality);
+    requestAnimationFrame(drawRail);
+  };
+  root.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => onTime?.(+b.dataset.t)));
   // ---- the NEON RAIL frame: one bar, chamfered at both ends, beveled in glossy magenta, a raised tab over the brand and
   //      one over the mode switch, and a tab under the chapter you are bound for; drawn to fit what it holds -----------
   const headerEl = $(".hud-top"), railEl = $(".railframe");
@@ -230,7 +274,7 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
     np.classList.toggle("is-on", Boolean(on && title));
   });
   addEventListener("keydown", (e) => {
-    if (e.key.toLowerCase() === "n" && !focusOpen) onNight?.();
+    if (e.key.toLowerCase() === "n" && !focusOpen) onTime?.(1 - (getNight?.() ?? 1));
     if (e.key === "Escape" && focusOpen) closeFocus();
   });
 
@@ -246,7 +290,7 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
     const x = Math.cos(a) * len * r, y = Math.sin(a) * len * r;
     knob.style.transform = `translate(${x}px, ${y}px)`;
     flight.virtual.steer = -x / r;
-    flight.virtual.throttle = Math.max(-0.6, -y / r);
+    flight.virtual.throttle = Math.max(-1, -y / r);
   };
   stick.addEventListener("pointerdown", (e) => {
     stickId = e.pointerId;
@@ -267,13 +311,18 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
   };
   stick.addEventListener("pointerup", release);
   stick.addEventListener("pointercancel", release);
-  root.querySelectorAll(".tbtns button").forEach((b) =>
+  root.querySelectorAll(".tbtns button").forEach((b) => {
     b.addEventListener("click", () => {
       if (b.dataset.act === "skim") flight.toggleSkim();
       if (b.dataset.act === "auto") flight.toggleAutopilot();
       if (b.dataset.act === "cam") flight.cycleView();
-    }),
-  );
+    });
+    // UP and DN climb and sink for as long as they are held
+    const climb = b.dataset.act === "up" ? 1 : b.dataset.act === "down" ? -1 : 0;
+    if (!climb) return;
+    b.addEventListener("pointerdown", () => (flight.virtual.climb = climb));
+    for (const ev of ["pointerup", "pointercancel", "pointerleave"]) b.addEventListener(ev, () => (flight.virtual.climb = 0));
+  });
 
   // ---- the title: BOARD dives the camera through the great torii and hands over the controls -----------------------
   $(".board").addEventListener("click", () => flight.board());
@@ -282,23 +331,25 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
   });
 
   // ---- chapters: fly straight to one (boarding first, from the home screen) -------------------------------------------
+  // (each stops in the avenue and turns to face its landmark, the way a car pulls up facing the shop)
+  const V = port.plan.vision, C = port.plan.crab;
   const CHAPTERS = [
-    { name: "KRAKEN VISION", x: -12, z: 300 },
-    { name: "THE CRAB", x: 22, z: 664 },
-    { name: "TENRYŪ PAGODA", x: 0, z: -96, gaze: 42 }, // (stops where the whole pagoda can be seen, and looks up at it)
-    { name: "MUGEN WARD", x: 0, z: -1440 },
+    { name: "KRAKEN VISION", x: -12, z: 300, face: V ? [V.cx, V.y0 + V.h / 2, V.cz] : null },
+    { name: "THE CRAB", x: 22, z: 664, face: C ? [C.x, C.y, C.z] : null },
+    { name: "TENRYŪ PAGODA", x: 0, z: -96, gaze: 42, face: [0, 260, PORT.temple.z] }, // (where the whole pagoda can be seen, looking up at it)
+    { name: "MUGEN WARD", x: 0, z: -1440, face: [0, 120, -2600] },
   ];
   root.querySelectorAll(".chapters button").forEach((b) =>
     b.addEventListener("click", () => {
       const ch = CHAPTERS[+b.dataset.ch];
       root.querySelectorAll(".chapters button").forEach((o) => o.classList.toggle("is-on", o === b));
       requestAnimationFrame(drawRail);
-      const go = () => flight.goTo(ch.name, ch.x, ch.z);
+      const go = () => flight.goTo(ch.name, ch.x, ch.z, ch.face);
       if (flight.state.view !== "title" && inWards(flight.state.pos.x, flight.state.pos.z)) {
         // far out in the wards the autopilot knows no route home: the line recalls the shuttle to the Grand Channel
         hud.classList.add("is-recall");
         setTimeout(() => {
-          flight.recall(10, 420, 0);
+          flight.recall(10, 420, 0); // (back on the Grand Avenue)
           go();
         }, 520);
         setTimeout(() => hud.classList.remove("is-recall"), 1300);
@@ -314,7 +365,9 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
     }),
   );
   const arrive = $(".arrive");
+  let arrivedAt = -1e9;
   flight.onArrive = (name) => {
+    arrivedAt = performance.now();
     const ch = CHAPTERS.find((c) => c.name === name);
     if (ch?.gaze) flight.gaze(ch.gaze, 8);
     arrive.querySelector("b").textContent = name;
@@ -357,7 +410,7 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
   }
 
   // ---- tags: a pool of reticles and brackets, reused each frame ---------------------------------------------------
-  const reticles = Array.from({ length: 4 }, () => {
+  const reticles = Array.from({ length: 3 }, () => {
     const el = document.createElement("div");
     el.className = "lock";
     el.innerHTML = `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" class="r1"/><circle cx="50" cy="50" r="31" class="r2"/>
@@ -436,13 +489,13 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
     // where are we, and what is next
     const p = s.pos;
     const T = PORT.temple;
-    let place = "GRAND CHANNEL";
-    if (p.z > PORT.channel.z0) place = "HARBOUR MOUTH";
-    else if (Math.hypot(p.x, p.z - T.z) < T.r + 30) place = "TENRYŪ BASIN";
+    let place = "GRAND AVENUE";
+    if (p.z > PORT.channel.z0) place = "TORII GATE";
+    else if (Math.hypot(p.x, p.z - T.z) < T.r + 30) place = "TENRYŪ PLAZA";
     else if (inWards(p.x, p.z)) place = wardName(p.x, p.z);
     else if (p.z < PORT.channel.z1) place = "WARD GATE";
     PORT.cross.forEach((c, i) => {
-      if (Math.abs(p.z - c.z) < c.w * 0.7) place = CANALS[i];
+      if (Math.abs(p.z - c.z) < c.w * 0.7) place = STREETS[i];
     });
     const ahead = flight.forward();
     const marks = [
@@ -462,37 +515,61 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
       : s.autopilot
       ? "AUTOPILOT · TOURING THE PORT"
       : kmh < 2
-        ? touchUI ? "STICK UP TO TAXI" : "W TO TAXI"
+        ? touchUI ? "STICK UP TO FLY" : "W TO FLY"
         : s.skim
-          ? touchUI ? "SKIM TO SETTLE" : "F TO SETTLE ON THE WATER"
-          : touchUI ? "SKIM TO LIFT OFF" : "F TO SKIM";
+          ? touchUI ? "SKY TO DROP TO THE STREET" : "F TO DROP TO THE STREET"
+          : touchUI ? "SKY FOR THE SKY LANE" : "F FOR THE SKY LANE · E/Q UP/DOWN";
     root.querySelector('[data-act="skim"]').setAttribute("aria-pressed", String(s.skim));
     root.querySelector('[data-act="auto"]').setAttribute("aria-pressed", String(s.autopilot));
     setText(".t-a", place);
-    // the direction arrow: points along the canal route to the next turn (not through the buildings), says which way
+    // the trip, turn by turn: the next turn along the route (not through the buildings), which way and how far, and
+    // where it all ends; a driving game's GPS chip. In the cockpit it moves into the HUD glass and the dash.
+    const tripNow = flight.trip;
+    let turn = null;
+    if (tripNow && s.view !== "title") {
+      const ahead2 = flight.routeAhead() ?? [];
+      const pts = [{ x: p.x, z: p.z }, ...ahead2];
+      // the route's length still to fly, and its first bend worth calling out
+      let total = 0;
+      for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
+      const hx = -Math.sin(s.yaw), hz = -Math.cos(s.yaw);
+      let along = 0, ang = 0, at = total;
+      for (let i = 1; i < pts.length; i++) {
+        const dx = pts[i].x - pts[i - 1].x, dz = pts[i].z - pts[i - 1].z, dl = Math.hypot(dx, dz) || 1;
+        // heading of this leg against the hull (first leg) or the leg before it
+        const px = i === 1 ? hx : (pts[i - 1].x - pts[i - 2].x), pz = i === 1 ? hz : (pts[i - 1].z - pts[i - 2].z);
+        const a = Math.atan2(px * dz - pz * dx, px * dx + pz * dz); // (positive: to the right)
+        if (Math.abs(a) > 0.3 && (i > 1 || dl > 30)) {
+          ang = a;
+          at = i === 1 ? 0 : along;
+          break;
+        }
+        along += dl;
+      }
+      turn = { m: maneuver(ang), dist: at, total, name: tripNow.name };
+    }
     {
       const na = root.querySelector(".navarrow");
-      const gp = flight.guide();
-      if (gp && s.view !== "title") {
-        camera.getWorldDirection(tmp);
-        const fl = Math.hypot(tmp.x, tmp.z) || 1, fxx = tmp.x / fl, fzz = tmp.z / fl;
-        const dx = gp.x - p.x, dz = gp.z - p.z, dl = Math.hypot(dx, dz) || 1;
-        const ahead = (dx * fxx + dz * fzz) / dl, side = (dx * -fzz + dz * fxx) / dl;
-        const ang = Math.atan2(side, ahead);
-        na.style.setProperty("--r", `${ang.toFixed(3)}rad`);
-        const deg = Math.abs((ang * 180) / Math.PI);
-        setText(".na-turn", deg < 20 ? "AHEAD" : deg > 140 ? "TURN AROUND" : `${deg < 60 ? "BEAR" : "TURN"} ${ang < 0 ? "LEFT" : "RIGHT"}`);
-        setText(".na-to", `${flight.trip.name} · ${Math.round(Math.hypot(flight.trip.x - p.x, flight.trip.z - p.z))} M`);
+      if (turn && s.view !== "cockpit") {
+        const t = turn.m;
+        if (na.dataset.k !== t.k + t.left) {
+          na.dataset.k = t.k + t.left;
+          na.querySelector("path").setAttribute("d", TURN[t.k]);
+          na.classList.toggle("is-left", t.left);
+        }
+        setText(".na-dist", turn.dist < 12 ? "NOW" : `${Math.round(turn.dist / 5) * 5} M`);
+        setText(".na-turn", t.words);
+        setText(".na-to", `${turn.name} · ${Math.round(turn.total / 10) * 10} M`);
         na.hidden = false;
       } else na.hidden = true;
     }
-    // guidance: where the trip is going, a diamond over the place with its distance; off screen it waits at the edge,
+    // the guide: a diamond on the landmark the trip is bound for, with its distance; off screen it waits at the edge,
     // pointing the way
     {
       const g = root.querySelector(".guide");
-      const tripG = flight.trip;
-      if (tripG && s.view !== "title") {
-        const pr = project(tmp.set(tripG.x, 26, tripG.z));
+      if (tripNow && s.view !== "title") {
+        const f = tripNow.face;
+        const pr = project(f ? tmp.set(f[0], Math.min(f[1], 120), f[2]) : tmp.set(tripNow.x, 26, tripNow.z));
         const behind = v.z > 1;
         let x = behind ? innerWidth - pr.x : pr.x, y = behind ? innerHeight * 0.8 : pr.y;
         const m = 64, cx = innerWidth / 2, cy = innerHeight / 2;
@@ -507,19 +584,39 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
         }
         g.classList.toggle("is-edge", !inside);
         g.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
-        setText(".gd-name", tripG.name);
-        setText(".gd-dist", `${Math.round(Math.hypot(tripG.x - p.x, tripG.z - p.z))} M`);
+        setText(".gd-name", tripNow.name);
+        setText(".gd-dist", `${Math.round(Math.hypot((f ? f[0] : tripNow.x) - p.x, (f ? f[2] : tripNow.z) - p.z))} M`);
         g.hidden = false;
       } else g.hidden = true;
     }
     setText(".t-b", next ? `${next.name} · ${Math.round(nd)} M` : `${Math.round(kmh)} KM/H`);
-    setText(".t-c", s.blocked > 0.2 ? "MIND THE PONTOONS" : action);
-    // the HUD glass (cockpit)
+    setText(".t-c", s.blocked > 0.2 ? "MIND THE BUILDINGS" : action);
+    // the HUD glass and the dash (cockpit)
+    const mode = s.autopilot ? "AUTOPILOT" : s.skim ? "SKY LANE" : "HOVER";
     setText(".g-speed", String(Math.round(kmh)));
-    setText(".g-dist", next ? `${Math.round(nd)} M` : "—");
-    setText(".g-place", next ? next.name : place);
-    setText(".g-mode", s.autopilot ? "AUTOPILOT" : s.skim ? "SKIM" : "TAXI");
+    setText(".g-dist", turn ? (turn.dist < 12 ? "NOW" : `${Math.round(turn.dist / 5) * 5} M`) : next ? `${Math.round(nd)} M` : "—");
+    setText(".g-place", turn ? turn.m.words : next ? next.name : place);
+    setText(".g-mode", mode);
     setText(".g-alt", s.pos.y.toFixed(1));
+    if (s.view === "cockpit") {
+      setText(".d-mode", mode);
+      setText(".d-dist", turn ? `${Math.round(turn.total / 10) * 10} M` : `${Math.round(s.pos.y)} M`);
+      setText(".d-what", turn ? turn.name : "ALTITUDE");
+      const dk = turn ? turn.m.k + turn.m.left : "ahead";
+      const dt = root.querySelector(".d-turn");
+      if (dt.dataset.k !== dk) {
+        dt.dataset.k = dk;
+        dt.querySelector("path").setAttribute("d", TURN[turn ? turn.m.k : "ahead"]);
+        dt.classList.toggle("is-left", Boolean(turn?.m.left));
+      }
+      const glyph = root.querySelector(".g-turn");
+      if (glyph.dataset.k !== dk) {
+        glyph.dataset.k = dk;
+        glyph.querySelector("path").setAttribute("d", TURN[turn ? turn.m.k : "turn"]);
+        glyph.classList.toggle("is-left", Boolean(turn?.m.left));
+      }
+    }
+    setTimeUI(Math.round(getNight?.() ?? 1));
     const d = new Date();
     setText(".clock", `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
 
@@ -533,10 +630,15 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
       claimed.push(r);
       return true;
     };
-    // in the cockpit the HUD glass owns the middle of the screen
+    // in the cockpit the HUD glass owns the middle of the screen; on a trip the turn chip owns its corner
     if (s.view === "cockpit") {
       const g = glassEl.getBoundingClientRect();
       claimed.push({ x0: g.left - 24, x1: g.right + 24, y0: g.top - 24, y1: g.bottom + 24 });
+    }
+    const naEl = root.querySelector(".navarrow");
+    if (!naEl.hidden) {
+      const g = naEl.getBoundingClientRect();
+      claimed.push({ x0: g.left - 16, x1: g.right + 16, y0: g.top - 16, y1: g.bottom + 16 });
     }
     // corner brackets on the nearest screens in view, with a label
     const cands = [];
@@ -588,7 +690,8 @@ export function createHud({ flight, port, traffic, camera, onQuality, onNight, o
     }
     near.sort((a, b) => a.dist - b.dist);
     let locks = 0;
-    if (s.view !== "show" && s.view !== "title" && !focusOpen && !s.held) {
+    // (not while arriving: the landmark has the screen to itself for a few seconds)
+    if (s.view !== "show" && s.view !== "title" && !focusOpen && !s.held && performance.now() - arrivedAt > 7000) {
       for (const n of near) {
         if (locks >= reticles.length) break;
         const size = Math.max(36, Math.min(96, 3600 / n.dist));

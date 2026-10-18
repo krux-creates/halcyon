@@ -318,12 +318,14 @@ function buildDragon(U, opts) {
   const toCam = normalize(cameraPosition.sub(uPearl));
   const right = normalize(cross(vec3(0.0, 1.0, 0.0), toCam));
   const upB = cross(toCam, right);
-  const ps = float(K * 9.0);
+  const ps = float(K * 6.0);
   pm.positionNode = uPearl.add(right.mul(positionGeometry.x.mul(ps))).add(upB.mul(positionGeometry.y.mul(ps)));
   const pr = length(uv().sub(0.5)).mul(2.0);
   const flick = sin(U.time.mul(9.0)).mul(0.08).add(0.92);
-  pm.colorNode = vec3(1.0, 0.9, 0.6).mul(pow(max(float(1.0).sub(pr.mul(2.2)), 0.0), 1.5).mul(3.0).add(pow(max(float(1.0).sub(pr), 0.0), 3.0).mul(vec3(1.0, 0.45, 0.2)).mul(1.2))).mul(flick)
-    .mul(float(1.0).sub(U.fogFactor().mul(0.5)));
+  // a jewel of light, not a lamp: it holds back by day, and gives way when you fly right up to it
+  const near = smoothstep(K * 8.0, K * 40.0, length(cameraPosition.sub(uPearl)));
+  pm.colorNode = vec3(1.0, 0.9, 0.6).mul(pow(max(float(1.0).sub(pr.mul(2.2)), 0.0), 1.5).mul(1.7).add(pow(max(float(1.0).sub(pr), 0.0), 3.0).mul(vec3(1.0, 0.45, 0.2)).mul(0.8))).mul(flick)
+    .mul(mix(float(0.45), float(1.0), U.night)).mul(near).mul(float(1.0).sub(U.fogFactor().mul(0.5)));
   pm.fog = false;
   const pearl = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), pm);
   pearl.frustumCulled = false;

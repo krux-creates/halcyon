@@ -1,41 +1,42 @@
-// Music for the night descent: a playlist of the owner's own copies of two songs, played in turn from assets/audio/
-// (see README there; they are not shipped with the site). Without them HALCYON RADIO plays: an original score made
-// here in Web Audio, slow and warm and a little sad, an 80s synth night drive (pads, a plucked arpeggio through a long
-// echo, a round bass, soft drums). Never autoplays: the sound button starts it.
+// Music for the night descent. The owner's own copies of two songs play in turn from assets/audio/ when they are there
+// (see README there; they are not shipped with the site); otherwise the song plays through Spotify's embedded player,
+// and if Spotify cannot load, HALCYON RADIO: an original score made here in Web Audio, slow and warm and a little sad,
+// an 80s synth night drive (pads, a plucked arpeggio through a long echo, a round bass, soft drums). Never autoplays:
+// the sound button starts it.
 const PLAYLIST = [
   { src: "assets/audio/i-really-want-to-stay-at-your-house.mp3", title: "I Really Want to Stay at Your House — Rosa Walton" },
   { src: "assets/audio/still-love-you-slowed.mp3", title: "still love you (Slowed) — GLM-RST" },
 ];
 const RADIO_TITLE = "HALCYON RADIO — Night Descent 07";
-// the song itself, played through YouTube's own player (shown, as YouTube requires; never hidden or ripped)
-const YT = { id: "KvMY1uzSC1E", title: "I Really Want to Stay at Your House — Rosa Walton" };
+// the song itself, played through Spotify's own embedded player: audio only, the player shown small as Spotify asks
+// (signed-in listeners hear the whole track; everyone else gets Spotify's 30-second preview)
+const SPOTIFY = { uri: "spotify:track:7mykoq6R3BArsSpNDjFQTm", title: "I Really Want to Stay at Your House — Rosa Walton" };
 
-/** A small visible YouTube player in the corner, loaded on first use. Resolves when it is ready, or null if it can't be. */
-let ytPlayer = null, ytBox = null;
-function youtube() {
-  if (ytPlayer) return Promise.resolve(ytPlayer);
+/** A small Spotify card in the corner, loaded on first use. Resolves with its controller when ready, or null. */
+let spot = null, spotBox = null;
+function spotify() {
+  if (spot) return Promise.resolve(spot);
   return new Promise((resolve) => {
-    ytBox = Object.assign(document.createElement("div"), { className: "ytmini" });
-    ytBox.innerHTML = `<div class="yt-head"><i></i><span>${YT.title}</span></div><div id="yt-player"></div>`;
-    document.body.append(ytBox);
-    const make = () => {
-      ytPlayer = new window.YT.Player("yt-player", {
-        host: "https://www.youtube-nocookie.com",
-        videoId: YT.id,
-        width: "100%",
-        height: "100%",
-        playerVars: { autoplay: 1, playsinline: 1, loop: 1, playlist: YT.id, rel: 0, modestbranding: 1 },
-        events: { onReady: () => resolve(ytPlayer), onError: () => resolve(null) },
+    spotBox = Object.assign(document.createElement("div"), { className: "spmini" });
+    spotBox.innerHTML = `<div class="sp-head"><i></i><span>NOW PLAYING · ${SPOTIFY.title}</span></div><div id="sp-player"></div>`;
+    document.body.append(spotBox);
+    const make = (API) => {
+      API.createController(document.getElementById("sp-player"), { uri: SPOTIFY.uri, width: "100%", height: 80 }, (ctl) => {
+        spot = ctl;
+        ctl.addListener("ready", () => resolve(ctl));
       });
     };
-    if (window.YT?.Player) make();
+    if (window.__spotifyAPI) make(window.__spotifyAPI);
     else {
-      window.onYouTubeIframeAPIReady = make;
-      const sc = Object.assign(document.createElement("script"), { src: "https://www.youtube.com/iframe_api", async: true });
+      window.onSpotifyIframeApiReady = (API) => {
+        window.__spotifyAPI = API;
+        make(API);
+      };
+      const sc = Object.assign(document.createElement("script"), { src: "https://open.spotify.com/embed/iframe-api/v1", async: true });
       sc.onerror = () => resolve(null);
       document.head.append(sc);
     }
-    setTimeout(() => resolve(ytPlayer && ytPlayer.playVideo ? ytPlayer : null), 9000);
+    setTimeout(() => resolve(spot), 9000);
   });
 }
 
@@ -59,13 +60,15 @@ export function createMusic({ onTitle } = {}) {
   async function start() {
     const songs = await found;
     if (!songs.length) {
-      const yt = await youtube();
-      if (yt) {
-        ytBox.classList.add("is-on");
-        yt.playVideo();
-        mode = "youtube";
-        return YT.title;
+      const sp = await spotify();
+      if (sp) {
+        spotBox.classList.add("is-on");
+        sp.play();
+        mode = "spotify";
+        return SPOTIFY.title;
       }
+      spotBox?.remove();
+      spotBox = null;
     }
     if (songs.length) {
       if (!el) {
@@ -103,9 +106,9 @@ export function createMusic({ onTitle } = {}) {
   }
   function stop() {
     if (mode === "track") el?.pause();
-    if (mode === "youtube") {
-      ytPlayer?.pauseVideo?.();
-      ytBox?.classList.remove("is-on");
+    if (mode === "spotify") {
+      spot?.pause();
+      spotBox?.classList.remove("is-on");
     }
     if (mode === "radio" && ctx) {
       master.gain.setTargetAtTime(0, ctx.currentTime, 0.4);

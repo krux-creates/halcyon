@@ -229,6 +229,9 @@ body {
   font-family: var(--mono);
   color: var(--paper);
 }
+.hud [hidden] {
+  display: none !important;
+}
 .hud button {
   font: inherit;
   color: inherit;
@@ -264,6 +267,7 @@ body {
 }
 .hud-top {
   position: absolute;
+  z-index: 3;
   top: 16px;
   left: 16px;
   right: 16px;
@@ -1181,7 +1185,7 @@ body {
   stroke: #fff4f0;
   transform: translate(2px, -2px);
 }
-.glass {
+.glassbtn {
   display: inline-flex !important;
   align-items: center;
   gap: 10px;
@@ -1196,7 +1200,7 @@ body {
   text-transform: uppercase;
   transition: box-shadow 220ms var(--ease);
 }
-.glass:hover {
+.glassbtn:hover {
   box-shadow: inset 0 0 0 1px rgba(217, 178, 106, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 8px 24px -10px rgba(0, 0, 0, 0.6);
 }
 
@@ -1425,15 +1429,32 @@ body {
 }
 .tbtns {
   position: absolute;
-  right: 24px;
-  bottom: 96px;
+  right: 20px;
+  bottom: 92px;
   display: grid;
+  grid-template-columns: 56px 56px;
+  grid-template-rows: repeat(3, 56px);
   gap: 12px;
   pointer-events: auto;
 }
+.tbtns [data-act="up"] {
+  grid-area: 2 / 1;
+}
+.tbtns [data-act="down"] {
+  grid-area: 3 / 1;
+}
+.tbtns [data-act="skim"] {
+  grid-area: 1 / 2;
+}
+.tbtns [data-act="auto"] {
+  grid-area: 2 / 2;
+}
+.tbtns [data-act="cam"] {
+  grid-area: 3 / 2;
+}
 .tbtns button {
-  width: 64px !important;
-  height: 64px;
+  width: 56px !important;
+  height: 56px;
   border-radius: 50% !important;
   background: var(--pill) !important;
   box-shadow: var(--ring);
@@ -1587,6 +1608,7 @@ body[data-ui="rail"] {
   --amber-line: rgba(255, 79, 196, 0.7);
 }
 body[data-ui="rail"] .hud-top {
+  z-index: 3;
   top: 26px;
   left: 50%;
   right: auto;
@@ -2472,13 +2494,13 @@ body[data-ui="rail"] .np {
   box-shadow: inset 0 0 0 1px rgba(var(--rf-glow), 0.45);
 }
 
-/* ---- the song: YouTube's own player, small and visible in a frame of the bar's neon ----------------------------------- */
-.ytmini {
+/* ---- the song: Spotify's own player, small and visible in a frame of the bar's neon (audio only, no video) -------------- */
+.spmini {
   position: fixed;
   right: 18px;
   bottom: 120px;
   z-index: 30;
-  width: 240px;
+  width: 320px;
   padding: 0 0 6px;
   background: rgba(14, 5, 22, 0.94);
   box-shadow: inset 0 0 0 1px rgba(255, 85, 214, 0.7), 0 0 22px rgba(255, 61, 187, 0.35), 0 12px 30px rgba(0, 0, 0, 0.6);
@@ -2488,13 +2510,13 @@ body[data-ui="rail"] .np {
   transform: translateY(8px);
   transition: opacity 220ms var(--ease), transform 220ms var(--ease), visibility 0s 220ms;
 }
-.ytmini.is-on {
+.spmini.is-on {
   opacity: 1;
   visibility: visible;
   transform: none;
   transition: opacity 220ms var(--ease), transform 220ms var(--ease);
 }
-.ytmini .yt-head {
+.spmini .sp-head {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2503,8 +2525,14 @@ body[data-ui="rail"] .np {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #ffd6f6;
+  white-space: nowrap;
+  overflow: hidden;
 }
-.ytmini .yt-head i {
+.spmini .sp-head span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spmini .sp-head i {
   flex: none;
   width: 6px;
   height: 6px;
@@ -2513,23 +2541,254 @@ body[data-ui="rail"] .np {
   box-shadow: 0 0 8px #ff55d6;
   animation: blink 1.4s ease-in-out infinite;
 }
-.ytmini #yt-player,
-.ytmini iframe {
+.spmini #sp-player,
+.spmini iframe {
   display: block;
-  width: 228px;
-  height: 200px;
+  width: calc(100% - 12px) !important;
+  height: 80px;
   margin: 0 6px;
   border: 0;
+  border-radius: 8px;
 }
 @media (max-width: 860px) {
-  .ytmini {
+  .spmini {
     top: 112px;
     bottom: auto;
     right: 10px;
-    width: 220px;
+    width: min(300px, calc(100vw - 20px));
   }
-  .ytmini #yt-player,
-  .ytmini iframe {
-    width: 208px;
+}
+
+/* ---- the trip, turn by turn: a driving game's GPS chip under the rail (the next turn, how far, where it all ends) ----- */
+.navarrow {
+  position: absolute;
+  top: 104px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 16px 0 8px;
+  background: rgba(10, 4, 16, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(255, 85, 214, 0.5), 0 0 18px rgba(255, 61, 187, 0.16);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: na-in 220ms var(--ease) both;
+}
+@keyframes na-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
   }
+}
+.na-ic,
+.d-turn,
+.g-turn {
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px var(--amber-line));
+}
+.na-ic {
+  width: 36px;
+  height: 36px;
+  padding: 3px;
+}
+.na-ic.is-left,
+.navarrow.is-left .na-ic,
+.d-turn.is-left,
+.g-turn.is-left {
+  transform: scaleX(-1);
+}
+.navarrow p {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+.navarrow b {
+  font: 500 22px/1 var(--sans);
+  font-stretch: 125%;
+  letter-spacing: 0.04em;
+  color: var(--paper);
+  white-space: nowrap;
+}
+.navarrow small {
+  font: 10px/1 var(--mono);
+  letter-spacing: 0.22em;
+  color: var(--amber);
+  white-space: nowrap;
+}
+.na-to {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding-left: 12px;
+  border-left: 1px solid rgba(240, 235, 227, 0.16);
+  font: 10px/1 var(--mono);
+  letter-spacing: 0.18em;
+  color: var(--dim);
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .navarrow {
+    top: 76px;
+    height: 44px;
+  }
+  .navarrow b {
+    font-size: 18px;
+  }
+  .na-to {
+    display: none;
+  }
+}
+
+/* ---- the cockpit: Rive City's car interior in our hand. A roof line and two A-pillars frame the windscreen, the dash
+   runs across the bottom with a neon edge, and its screen carries the charge, the drive mode and the trip ----------- */
+.cockpit {
+  --u: max(100vw / 1440, 100vh / 900);
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 200ms, visibility 0s 200ms;
+}
+.hud[data-view="cockpit"] .cockpit {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 200ms;
+}
+.ck-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.ck-roof,
+.ck-door {
+  fill: #050408;
+}
+.ck-sill {
+  fill: none;
+  stroke: rgba(255, 85, 214, 0.35);
+  stroke-width: 1.2;
+}
+.ck-edge {
+  fill: none;
+  stroke: #ff55d6;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 6px rgba(255, 61, 187, 0.85));
+}
+.ck-hood {
+  fill: none;
+  stroke: rgba(240, 235, 227, 0.1);
+  stroke-width: 1.2;
+}
+.dash {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--u) * 208);
+  display: grid;
+  grid-template-columns: 1fr 1.25fr 1fr;
+  align-items: center;
+  width: min(calc(var(--u) * 560), calc(100vw - 24px));
+  height: max(64px, calc(var(--u) * 92));
+  padding: 0 20px;
+  background: linear-gradient(180deg, #120d1a, #07050c);
+  box-shadow: inset 0 0 0 1px rgba(255, 85, 214, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 32px rgba(255, 61, 187, 0.12);
+  clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 100%, 0 100%);
+  transform: translateX(-50%);
+}
+.d-cell {
+  display: grid;
+  gap: 5px;
+  justify-items: start;
+}
+.d-m {
+  justify-items: center;
+}
+.d-r {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.dash small {
+  font: 8px/1 var(--mono);
+  letter-spacing: 0.24em;
+  color: var(--mute);
+  white-space: nowrap;
+}
+.d-charge {
+  font: 500 22px/1 var(--sans);
+  font-stretch: 125%;
+  color: var(--paper);
+}
+.d-charge i {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--dim);
+}
+.d-bar {
+  width: 72px;
+  height: 3px;
+  background: rgba(240, 235, 227, 0.12);
+}
+.d-bar i {
+  display: block;
+  width: 86%;
+  height: 100%;
+  background: linear-gradient(90deg, #8a5cff, #ff55d6);
+}
+.d-mode {
+  font: 600 20px/1 var(--sans);
+  font-stretch: 125%;
+  letter-spacing: 0.1em;
+  color: var(--amber);
+  text-shadow: 0 0 14px var(--amber-line);
+  white-space: nowrap;
+}
+.d-gear {
+  display: flex;
+  gap: 10px;
+  font: 9px/1 var(--mono);
+  color: var(--mute);
+}
+.d-gear i {
+  font-style: normal;
+}
+.d-gear .is-on {
+  color: var(--amber);
+}
+.d-turn {
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+.d-dist {
+  display: block;
+  font: 500 18px/1 var(--sans);
+  font-stretch: 125%;
+  color: var(--paper);
+  white-space: nowrap;
+}
+.d-what {
+  display: block;
+  margin-top: 4px;
+}
+@media (max-width: 760px) {
+  .dash {
+    grid-template-columns: 1.2fr 1fr;
+    padding: 0 14px;
+  }
+  .d-l {
+    display: none;
+  }
+}
+/* on touch the controls sit over the dash: the HUD glass carries the same readouts, so the dash screen steps aside */
+.hud.is-touch .dash {
+  display: none;
 }

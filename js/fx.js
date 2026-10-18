@@ -1,7 +1,7 @@
 // Shared light-and-haze helpers for the landmarks: their own fog (the haze softens a lit landmark without swallowing
 // it) and camera-facing glows for beacons, lamps and the jewels on eave tips.
 import * as THREE from "three";
-import { vec3, float, mix, step, fract, length, max, pow, positionGeometry, instancedBufferAttribute, positionWorld, cameraPosition, normalize, uv, select, cross, Fn, uint } from "three/tsl";
+import { vec3, float, mix, step, fract, length, max, pow, positionGeometry, instancedBufferAttribute, positionWorld, cameraPosition, normalize, uv, select, cross, Fn, uint, smoothstep } from "three/tsl";
 
 /**
  * TSL's hash, compiled once as a real WGSL function. The built-in is inlined at every call and uses its argument about
@@ -42,7 +42,9 @@ export function glowPoints(U, pts, { blink = true, gain = 3.0 } = {}) {
   const rr = length(uv().sub(0.5)).mul(2.0);
   const core = pow(max(float(1.0).sub(rr), 0.0), 5.0).add(pow(max(float(1.0).sub(rr), 0.0), 2.0).mul(0.15));
   const blinkOn = select(C.w.lessThan(0.0), float(1.0), step(0.5, fract(U.time.mul(0.5).add(C.w))).mul(0.85).add(0.15));
-  m.colorNode = C.xyz.mul(core).mul(blinkOn).mul(gain).mul(float(1.0).sub(U.fogFactor().mul(0.5)));
+  // a glow is a light seen from afar: fly up to one and it gives way to the lamp itself instead of whiting out the screen
+  const near = smoothstep(P.w.mul(1.2), P.w.mul(5.0), dist);
+  m.colorNode = C.xyz.mul(core).mul(blinkOn).mul(gain).mul(near).mul(float(1.0).sub(U.fogFactor().mul(0.5)));
   m.fog = false;
   const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), m, pts.length);
   mesh.frustumCulled = false;

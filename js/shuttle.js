@@ -356,7 +356,8 @@ export function createShuttle() {
   {
     const r = length(uv().sub(0.5)).mul(2.0);
     const flicker = sin(U.time.mul(40.0)).mul(0.04).add(0.96);
-    coreMat.colorNode = mix(vec3(1.0, 0.82, 0.5), vec3(1.0, 0.45, 0.08), smoothstep(0.0, 1.0, r)).mul(U.throttle.mul(2.2).add(0.45)).mul(flicker);
+    // a hot orange core, not a white lamp: it glows under the bloom without blowing out the frame behind the shuttle
+    coreMat.colorNode = mix(vec3(1.0, 0.64, 0.32), vec3(1.0, 0.34, 0.06), smoothstep(0.0, 1.0, r)).mul(U.throttle.mul(1.05).add(0.32)).mul(flicker);
   }
   const nozzles = [];
   for (const sx of [-1, 1]) {
@@ -409,6 +410,9 @@ export function createShuttle() {
     group,
     U,
     length: 26.2,
+    // the three nozzles (the pods' and the main engine's), where the engine trails start, and their trails' half-widths
+    engines: [new THREE.Vector3(-POD_X, POD_Y, 12.7), new THREE.Vector3(POD_X, POD_Y, 12.7), new THREE.Vector3(0, 0.5, 13.4)],
+    engineWidths: [0.5, 0.5, 0.75],
     setNight(x) {
       U.night.value = x;
       const env = x > 0.5 ? envNight : envDay;
@@ -417,7 +421,8 @@ export function createShuttle() {
           m.envMap = env;
           m.needsUpdate = true;
         }
-        m.envMapIntensity = 1.0 - 0.45 * x;
+        // (the same by day as by night: any more and the bright haze flares white off the wings)
+        m.envMapIntensity = 0.55;
       }
     },
     tick(time, throttle = 0.2) {
@@ -436,7 +441,7 @@ function glowSprites(U, list) {
     const core = pow(max(float(1.0).sub(r), 0.0), 5.0).add(pow(max(float(1.0).sub(r), 0.0), 2.0).mul(0.15));
     let k = float(1.0);
     if (l.blink >= 0) k = step(0.9, fract(U.time.mul(0.8).add(l.blink))).mul(1.6);
-    if (l.blink === -2) k = U.throttle.mul(1.8).add(0.06);
+    if (l.blink === -2) k = U.throttle.mul(0.8).add(0.05);
     m.colorNode = vec3(...l.color).mul(core).mul(k).mul(mix(float(0.6), float(1.4), U.night)).mul(U.lights).mul(2.0);
     const sprite = new THREE.Mesh(new THREE.PlaneGeometry(l.size, l.size), m);
     sprite.position.set(...l.at);

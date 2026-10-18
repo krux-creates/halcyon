@@ -94,7 +94,7 @@ for v in mesh.vertices:
     y = y * 3.3
     if z > 0:
         z += 0.22 * math.exp(-(x * x) * 0.8) * (1 - abs(y) / 3.3)
-    v.co = (x, y, z * 1.45)
+    v.co = (x * 1.3, y * 1.3, z * 1.45 * 1.3)
 for p in mesh.polygons:
     p.use_smooth = True
 # tubercles: a voronoi bump over the back
@@ -110,8 +110,8 @@ sub.levels = 1
 # the front rim: a row of short spines, and two eyes on stalks
 for i in range(11):
     t = (i / 10) * 2 - 1
-    x = t * 2.7
-    y = 3.0 - abs(t) ** 2 * 1.4
+    x = t * 2.7 * 1.3
+    y = (3.0 - abs(t) ** 2 * 1.4) * 1.3
     bpy.ops.mesh.primitive_cone_add(vertices=10, radius1=0.16, radius2=0.0, depth=0.42, location=(x, y + 0.12, 0.42))
     s = bpy.context.active_object
     s.name = f"spine_{i}"
@@ -119,7 +119,7 @@ for i in range(11):
     s.parent = body
 for side in (-1, 1):
     stalk = segment(f"eyestalk_{'L' if side < 0 else 'R'}", 0.55, 0.09, 0.07, parent=body)
-    stalk.location = (side * 0.62, 3.1, 0.75)
+    stalk.location = (side * 0.8, 4.0, 1.0)
     stalk.rotation_euler = Euler((0, -1.1, math.pi / 2 - side * 0.25), "XYZ")
     eye = knob(f"eye_{'L' if side < 0 else 'R'}", 0.24, stalk, (0.6, 0, 0))
 
@@ -134,45 +134,45 @@ LEGS = [
 for side in (-1, 1):
     s = "R" if side > 0 else "L"
     for k, (ay, splay, (l1, l2, l3, l4)) in enumerate(LEGS):
-        x0 = side * (3.3 - abs(ay) * 0.25)
-        root = empty(f"leg_{s}{k}", (x0, ay, -0.05), (0, 0, math.radians(splay) if side > 0 else math.pi - math.radians(splay)))
+        x0 = side * (3.3 - abs(ay) * 0.25) * 1.3
+        root = empty(f"leg_{s}{k}", (x0, ay * 1.3, -0.05), (0, 0, math.radians(splay) if side > 0 else math.pi - math.radians(splay)))
         root.parent = body
-        knob(f"leg_{s}{k}_hip", 0.6, root)
-        m = segment(f"leg_{s}{k}_s1", l1, 0.56, 0.48, parent=root, flat=0.7)
+        knob(f"leg_{s}{k}_hip", 0.88, root)
+        m = segment(f"leg_{s}{k}_s1", l1, 0.82, 0.74, parent=root, flat=0.78)
         m.rotation_euler = Euler((0, -0.18, 0), "XYZ")  # rising a little from the body
-        j1 = knob(f"leg_{s}{k}_k1", 0.5, m, (l1, 0, 0))
-        c = segment(f"leg_{s}{k}_s2", l2, 0.47, 0.42, parent=m, flat=0.72)
+        j1 = knob(f"leg_{s}{k}_k1", 0.8, m, (l1, 0, 0))
+        c = segment(f"leg_{s}{k}_s2", l2, 0.72, 0.66, parent=m, flat=0.8)
         c.location = (l1, 0, 0)
         c.rotation_euler = Euler((0, 0.5, side * (0.3 if k < 2 else -0.3)), "XYZ")  # the knee bends down
-        j2 = knob(f"leg_{s}{k}_k2", 0.44, c, (l2, 0, 0))
-        p = segment(f"leg_{s}{k}_s3", l3, 0.41, 0.3, parent=c, flat=0.74)
+        j2 = knob(f"leg_{s}{k}_k2", 0.72, c, (l2, 0, 0))
+        p = segment(f"leg_{s}{k}_s3", l3, 0.66, 0.52, parent=c, flat=0.82)
         p.location = (l2, 0, 0)
         p.rotation_euler = Euler((0, 0.22, side * (0.35 if k < 2 else -0.35)), "XYZ")
-        d = segment(f"leg_{s}{k}_s4", l4, 0.29, 0.0, parent=p, tip=True, flat=0.8)
+        d = segment(f"leg_{s}{k}_s4", l4, 0.5, 0.0, parent=p, tip=True, flat=0.85)
         d.location = (l3, 0, 0)
         d.rotation_euler = Euler((0, 0.35, side * 0.1), "XYZ")
 
 # ---- claws: a raised arm, a heavy hand, a fixed finger and a moving one ------------------------------------------------
 for side in (-1, 1):
     s = "R" if side > 0 else "L"
-    root = empty(f"claw_{s}", (side * 2.0, 2.6, 0.2), (0, 0, math.radians(58) if side > 0 else math.pi - math.radians(58)))
+    root = empty(f"claw_{s}", (side * 3.0, 3.2, 0.2), (0, 0, math.radians(42) if side > 0 else math.pi - math.radians(42)))
     root.parent = body
-    knob(f"claw_{s}_hip", 0.72, root)
-    a1 = segment(f"claw_{s}_s1", 3.2, 0.7, 0.62, parent=root, flat=0.72)
+    knob(f"claw_{s}_hip", 0.98, root)
+    a1 = segment(f"claw_{s}_s1", 4.6, 1.0, 0.92, parent=root, flat=0.8)
     a1.rotation_euler = Euler((0, -0.2, 0), "XYZ")
-    knob(f"claw_{s}_k1", 0.66, a1, (3.2, 0, 0))
-    a2 = segment(f"claw_{s}_s2", 2.4, 0.66, 0.78, parent=a1, flat=0.75)
-    a2.location = (3.2, 0, 0)
-    a2.rotation_euler = Euler((0, 0.15, side * -0.8), "XYZ")
-    knob(f"claw_{s}_k2", 0.72, a2, (2.4, 0, 0))
-    hand = segment(f"claw_{s}_hand", 2.8, 0.95, 0.72, parent=a2, flat=0.58)
+    knob(f"claw_{s}_k1", 0.98, a1, (4.6, 0, 0))
+    a2 = segment(f"claw_{s}_s2", 2.4, 0.88, 1.02, parent=a1, flat=0.8)
+    a2.location = (4.6, 0, 0)
+    a2.rotation_euler = Euler((0, 0.1, side * math.radians(46)), "XYZ")
+    knob(f"claw_{s}_k2", 0.98, a2, (2.4, 0, 0))
+    hand = segment(f"claw_{s}_hand", 3.1, 1.36, 1.02, parent=a2, flat=0.66)
     hand.location = (2.4, 0, 0)
-    hand.rotation_euler = Euler((0, 0.05, side * -0.6), "XYZ")
-    fixed = segment(f"claw_{s}_fixed", 2.1, 0.55, 0.0, parent=hand, tip=True, flat=0.7)
-    fixed.location = (2.8, 0, -0.1)
+    hand.rotation_euler = Euler((0, 0.05, side * math.radians(84)), "XYZ")
+    fixed = segment(f"claw_{s}_fixed", 2.3, 0.72, 0.0, parent=hand, tip=True, flat=0.75)
+    fixed.location = (3.1, side * 0.25, -0.1)
     fixed.rotation_euler = Euler((0, 0, side * 0.14), "XYZ")
-    move = segment(f"claw_{s}_finger", 2.2, 0.5, 0.0, parent=hand, tip=True, flat=0.7)
-    move.location = (2.6, side * -0.3, 0.2)
+    move = segment(f"claw_{s}_finger", 2.4, 0.66, 0.0, parent=hand, tip=True, flat=0.75)
+    move.location = (2.9, side * -0.45, 0.2)
     move.rotation_euler = Euler((0, 0, side * -0.36), "XYZ")
 
 # ---- export ------------------------------------------------------------------------------------------------------------

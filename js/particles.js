@@ -1,5 +1,5 @@
-// The air over Kraken Port: rain you can switch off, splashes on the sea, motes hanging in the haze, mist banks
-// lying on the water, steam from the rooftops and, at night, searchlights sweeping the cloud.
+// The air over Kraken Port: rain you can switch off, splashes on the street, motes hanging in the haze, mist banks
+// lying on the avenues, steam from the rooftops and, at night, searchlights sweeping the cloud.
 // Everything is one instanced mesh per effect, positioned and shaded on the GPU from the instance index and time.
 import * as THREE from "three";
 import {

@@ -1,16 +1,18 @@
-// Piloting HL-07 through Kraken Port. On the water it taxis like a boat; F lifts it into a low skim over the
-// canals. W/S throttle, A/D steer, Shift boost, P autopilot (a loop round the port: up the Grand Channel, round the
-// temple island, to the terminal and back), C camera (chase, cockpit, showroom), drag to look.
-// Platforms are solid: the hull and wing tips are tested against them and the shuttle slides along their edges.
+// Piloting HL-07 through Kraken Port the way Rive City's cars fly: hovering over the avenues, E / Space to climb and Q
+// to sink, F up to the sky lane and back down to the street. W/S throttle, A/D steer, Shift boost, P autopilot (a loop
+// round the port: up the Grand Avenue, round the pagoda's plaza, to the ward gate and back), C camera (chase,
+// cockpit, showroom), drag to look. Blocks are solid up to their tallest tower: the hull and wing tips are tested
+// against them and the shuttle slides along their edges; above a block's roofs it flies over.
 import * as THREE from "three";
 import { plotLand, PLOT } from "./districts.js";
 import { PORT } from "./port.js";
 import { TITLE_CAM } from "./hero.js";
 
-const TAXI = 24; // m/s
-const SKIM = 58;
-const SKIM_ALT = 22;
-const FLOAT_Y = 1.1;
+const TAXI = 24; // m/s, cruising down the avenues
+const SKIM = 58; // m/s, up in the sky lane
+// it flies the way Rive City's cars do: hovering above the street, climbing and sinking at will, and a sky lane above
+const HOVER = 12, HOVER_MIN = 5, SKY_LANE = 130;
+const FLOAT_Y = 1.1; // parked on the street
 const HALF_SPAN = 9.6;
 const NOSE = 13.6;
 
@@ -69,16 +71,30 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
     progress: 0,
     blocked: 0,
     gaze: 0, // metres the chase camera's aim is lifted: looking up at something tall on arrival
+    flyAlt: HOVER, // the height it flies at (E / Space climbs, Q sinks, F jumps to the sky lane and back)
   };
+  let faceTarget = null, faceUntil = 0;
   let gazeTarget = 0, gazeUntil = 0, nowT = 0;
   const keys = new Set();
-  const virtual = { throttle: 0, steer: 0 };
+  const virtual = { throttle: 0, steer: 0, climb: 0 };
 
-  // ---- solid ground: platform rectangles (and the expressway's pillars), the island, the wards' pontoons, the sea's
-  // southern edge. The hull never stops dead on them: whatever a point of it pushes into pushes it back out along the
+  // ---- solid blocks: the city's blocks up to their roofs (and the expressway's pillars), the pagoda, the wards' blocks,
+  // the city's southern edge. The hull never stops dead on them: whatever a point of it pushes into pushes it back out along the
   // shortest way, and the part of its motion going into the obstacle is taken away, so it scrapes along and slides off
   // (the way Rive City's car glances off a wall). It can always turn and drive away.
-  const solids = plan.platforms.map((p) => ({ x0: Math.min(p.x0, p.x1), x1: Math.max(p.x0, p.x1), z0: Math.min(p.z0, p.z1), z1: Math.max(p.z0, p.z1) }));
+  const CEILING = 480; // above this nothing in the city reaches but the pagoda's spire
+  const solids = plan.platforms.map((p) => ({ x0: Math.min(p.x0, p.x1), x1: Math.max(p.x0, p.x1), z0: Math.min(p.z0, p.z1), z1: Math.max(p.z0, p.z1), top: p.top ?? 0 }));
+  // how tall each block stands (its tallest tower, drum or dome), so up in the sky lane the shuttle passes over the low
+  // ones; a block with nothing known on it is taken to be tall
+  {
+    const raise = (x, z, top) => {
+      for (const s of solids) if (x > s.x0 - 1 && x < s.x1 + 1 && z > s.z0 - 1 && z < s.z1 + 1 && top > s.top) s.top = top;
+    };
+    for (const b of plan.boxes) raise(b.x, b.z, b.y + b.sy / 2);
+    for (const c of plan.cyls) raise(c.x, c.z, c.y + c.h / 2);
+    for (const d of plan.domes ?? []) raise(d.x, d.z, d.y + d.r);
+    for (const s of solids) if (!s.top) s.top = CEILING;
+  }
   const T = PORT.temple;
   const M = 1; // a metre of fender round everything
   /** How far (x, z) is inside a rectangle, and the way out; or null. */
@@ -89,12 +105,14 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
     if (best && best.d >= d) return best;
     return d === l ? { d, nx: -1, nz: 0 } : d === r ? { d, nx: 1, nz: 0 } : d === b ? { d, nx: 0, nz: -1 } : { d, nx: 0, nz: 1 };
   }
-  /** The deepest thing (x, z) is inside, as { d, nx, nz } (the depth and the way out), or null on open water. */
-  function penetration(x, z) {
+  /** The deepest thing (x, z) at height y is inside, as { d, nx, nz } (the depth and the way out), or null in open air. */
+  function penetration(x, z, y = 0) {
     let best = null;
-    const dx = x, dz = z - T.z, dist = Math.hypot(dx, dz), R = T.island + 6;
+    // the pagoda narrows as it climbs; above its finial there is nothing
+    const dx = x, dz = z - T.z, dist = Math.hypot(dx, dz), R = y < 660 ? (T.island + 6) * (1 - Math.min(0.85, Math.max(0, y - 20) / 700)) : 0;
     if (dist < R) best = { d: R - dist, nx: dist > 1e-3 ? dx / dist : 1, nz: dist > 1e-3 ? dz / dist : 0 };
-    for (const s of solids) best = outOfRect(x, z, s.x0, s.x1, s.z0, s.z1, best);
+    if (y > CEILING) return best;
+    for (const s of solids) if (y < s.top + 3) best = outOfRect(x, z, s.x0, s.x1, s.z0, s.z1, best);
     const land = plotLand(Math.floor(x / PLOT.X), Math.floor((z - PLOT.Z0) / PLOT.Z));
     if (land) best = outOfRect(x, z, land.x0, land.x1, land.z0, land.z1, best);
     if (z > 2200 && (!best || best.d < z - 2200)) best = { d: z - 2200, nx: 0, nz: -1 };
@@ -112,7 +130,7 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
       const fx = -Math.sin(state.yaw), fz = -Math.cos(state.yaw), rx = Math.cos(state.yaw), rz = -Math.sin(state.yaw);
       let worst = null;
       for (const [r, f] of PROBES) {
-        const pen = penetration(state.pos.x + rx * r + fx * f, state.pos.z + rz * r + fz * f);
+        const pen = penetration(state.pos.x + rx * r + fx * f, state.pos.z + rz * r + fz * f, state.pos.y);
         if (pen && (!worst || pen.d > worst.d)) worst = pen;
       }
       if (!worst) break;
@@ -136,12 +154,12 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
   }
 
   // ---- rescue: no headway for a while with the throttle open (wedged in a notch, pinned in a corner) and the hull
-  //      slides itself back to the nearest open water, facing the way to go. It can never be stuck. ------------------
+  //      slides itself back to the nearest open air, facing the way to go. It can never be stuck. --------------------
   const anchor = { x: 0, z: 0, t: 0 };
   let rescue = null;
   function hullClear(x, z, yaw, scale = 1.35) {
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
-    for (const [r, f] of PROBES) if (penetration(x + (rx * r + fx * f) * scale, z + (rz * r + fz * f) * scale)) return false;
+    for (const [r, f] of PROBES) if (penetration(x + (rx * r + fx * f) * scale, z + (rz * r + fz * f) * scale, state.pos.y)) return false;
     return true;
   }
   function openWaterNear(x, z, prefer) {
@@ -213,12 +231,19 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
   function autopilotSteer() {
     const p = new THREE.Vector2(state.pos.x, state.pos.z);
     if (trip) {
-      // on a trip: take the waypoints in order, slow into the last one and stop there
-      while (routeIx < route.length - 1 && p.distanceTo(route[routeIx]) < (route[routeIx].r ?? 55)) routeIx++;
+      // on a trip: take the waypoints in order (passed counts as reached, so it never circles one it missed), slow
+      // into the last one and stop there
+      while (routeIx < route.length - 1) {
+        const w = route[routeIx], nxt = route[routeIx + 1];
+        const passed = p.distanceTo(w) < 150 && (w.x - p.x) * (nxt.x - w.x) + (w.y - p.y) * (nxt.y - w.y) < 0;
+        if (p.distanceTo(w) < (w.r ?? 55) || passed) routeIx++;
+        else break;
+      }
       const t = route[routeIx];
       const dist = p.distanceTo(t);
-      if (routeIx === route.length - 1 && dist < 22 && Math.abs(state.speed) < 6) {
+      if (routeIx === route.length - 1 && dist < 34) {
         const name = trip.name;
+        if (trip.face) (faceTarget = trip.face), (faceUntil = nowT + 6);
         trip = null;
         route = loopPts;
         state.autopilot = false;
@@ -229,7 +254,7 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
       let d = Math.atan2(Math.sin(want - state.yaw), Math.cos(want - state.yaw));
       const last = routeIx === route.length - 1;
       const slow = last ? Math.min(1, dist / 160) : 1;
-      return { steer: Math.max(-1, Math.min(1, d * 2.2)), throttle: (Math.abs(d) > 0.6 ? 0.35 : 0.85) * Math.max(0.12, slow) };
+      return { steer: Math.max(-1, Math.min(1, d * 2.2)), throttle: pace(d, dist) * Math.max(0.12, slow) };
     }
     // touring: advance the target once we are close to it
     while (p.distanceTo(route[routeIx]) < (route[routeIx].r ?? 70)) routeIx = (routeIx + 1) % route.length;
@@ -237,7 +262,15 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
     const want = Math.atan2(-(t.x - p.x), -(t.y - p.y));
     let d = want - state.yaw;
     d = Math.atan2(Math.sin(d), Math.cos(d));
-    return { steer: Math.max(-1, Math.min(1, d * 2.2)), throttle: Math.abs(d) > 0.6 ? 0.35 : 0.8 };
+    return { steer: Math.max(-1, Math.min(1, d * 2.2)), throttle: pace(d, p.distanceTo(t)) };
+  }
+  /** How hard to drive at a target d radians off the nose and dist metres away: ease off when it lies inside the
+   *  circle the hull can turn at this speed, so it turns onto it instead of orbiting it. */
+  function pace(d, dist) {
+    const v = Math.max(2, Math.abs(state.speed));
+    const turnR = v / (0.14 + 0.4 * Math.min(1, v / 18));
+    if (Math.abs(d) > 0.45 && dist < turnR * 2.2) return 0.14;
+    return Math.abs(d) > 0.6 ? 0.35 : 0.85;
   }
   /** Waypoints from where the shuttle is to (x, z), up or down the Grand Channel, round the temple island. */
   function planTrip(x, z) {
@@ -253,26 +286,19 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
     return pts;
   }
 
-  // ---- step: the shuttle on the water ------------------------------------------------------------------------------
+  // ---- step: the shuttle in the air ---------------------------------------------------------------------------------
   // Velocity lives in the world, the hull points where you steer: turning swings the nose and the momentum carries on,
-  // so the hull slides out of a turn until the water grips it (hard when afloat, loosely when skimming). Five points
-  // on the pods and keel feel the water (swell + wakes); springs pull height, pitch and roll toward the surface they
-  // sit on, so it heaves over waves, rocks in its own wake and bounces when it lands.
+  // so it slides out of a turn until the air grips it (loosely up in the sky lane). Springs ease its height toward the
+  // altitude you set, and pitch and roll toward what it is doing: it banks into turns, noses down to speed up and lifts
+  // its nose to climb, with a slow breath of hover under it.
   const vel = new THREE.Vector2(0, 0);
-  const HULL = [[0, -11], [-7.7, -8], [7.7, -8], [-7.7, 9], [7.7, 9]];
-  const hullH = new Float32Array(5);
   const dyn = { y: FLOAT_Y, vy: 0, pitch: 0, vp: 0, roll: 0, vr: 0 };
-  let wasWet = true;
-  function waterAt(lx, lz) {
-    const c = Math.cos(state.yaw), s = Math.sin(state.yaw);
-    return water ? water.heightAt(state.pos.x + lx * c + lz * s, state.pos.z - lx * s + lz * c) : 0;
-  }
   function update(time, dt) {
     let throttle = 0, steer = 0;
     if (!state.held) {
       if (state.autopilot) ({ steer, throttle } = autopilotSteer());
       if (keys.has("w") || keys.has("arrowup")) throttle = 1;
-      if (keys.has("s") || keys.has("arrowdown")) throttle = -0.6;
+      if (keys.has("s") || keys.has("arrowdown")) throttle = -1;
       if (keys.has("a") || keys.has("arrowleft")) steer = 1;
       if (keys.has("d") || keys.has("arrowright")) steer = -1;
       if (virtual.throttle) throttle = virtual.throttle;
@@ -292,9 +318,9 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
     vF = vel.x * fx + vel.y * fz;
     let vL = vel.x * rx + vel.y * rz;
     const top = (state.skim ? SKIM : TAXI) * (state.boost ? 1.5 : 1);
-    const target = throttle >= 0 ? throttle * top : throttle * TAXI * 0.4;
-    // thrust and water drag along the hull; the water grips sideways
-    vF += (target - vF) * Math.min(1, dt * (throttle ? 0.5 : 0.28));
+    const target = throttle >= 0 ? throttle * top : throttle * TAXI * 0.75;
+    // thrust and water drag along the hull; the water grips sideways (reverse bites quicker, the way a gear does)
+    vF += (target - vF) * Math.min(1, dt * (throttle < 0 ? 0.9 : throttle ? 0.5 : 0.28));
     vL *= Math.exp(-dt * (state.skim ? 0.9 : 2.4));
     vel.set(fx * vF + rx * vL, fz * vF + rz * vL);
     state.speed = vF;
@@ -306,9 +332,17 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
     const impact = resolveHull();
     if (impact > 2.5) knock(impact > 9);
     else state.blocked = Math.max(0, state.blocked - dt);
+    // arrived: turn the hull to face the place (the way a car pulls up facing the shop), unless the pilot steers
+    if (faceTarget) {
+      const want = Math.atan2(-(faceTarget[0] - state.pos.x), -(faceTarget[2] - state.pos.z));
+      const dy = Math.atan2(Math.sin(want - state.yaw), Math.cos(want - state.yaw));
+      if (steer || time > faceUntil || Math.abs(dy) < 0.02) faceTarget = null;
+      else state.yaw += Math.sign(dy) * Math.min(Math.abs(dy), 0.9 * dt);
+    }
     // a trip you drive yourself arrives when you get there
     if (trip && !state.autopilot && Math.hypot(trip.x - state.pos.x, trip.z - state.pos.z) < 40) {
       const name = trip.name;
+      if (trip.face) (faceTarget = trip.face), (faceUntil = time + 6);
       trip = null;
       route = loopPts;
       api.onArrive?.(name);
@@ -353,35 +387,26 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
     }
     state.speed = vel.x * fx + vel.y * fz;
     state.slip = vel.x * rx + vel.y * rz;
-    // float or fly
-    for (let i = 0; i < 5; i++) hullH[i] = waterAt(HULL[i][0], HULL[i][1]);
-    const mean = (hullH[0] * 0.6 + hullH[1] + hullH[2] + hullH[3] + hullH[4]) / 4.6;
-    const front = (hullH[0] + hullH[1] + hullH[2]) / 3, back = (hullH[3] + hullH[4]) / 2;
-    const left = (hullH[1] + hullH[3]) / 2, right = (hullH[2] + hullH[4]) / 2;
-    const planing = Math.min(1, Math.abs(vF) / 15);
-    const wantY = state.skim ? SKIM_ALT + Math.sin(time * 0.9) * 0.35 : FLOAT_Y + mean + planing * 0.25;
-    const wantPitch = state.skim ? (throttle > 0 ? -0.02 : 0.015) * planing : Math.atan2(front - back, 17) + (throttle > 0 ? 0.035 : 0.006) * planing;
-    const wantRoll = (state.skim ? 0 : Math.atan2(right - left, 15.4)) + steer * Math.min(1, Math.abs(vF) / 20) * (state.skim ? 0.42 : 0.1) - vL * 0.012;
-    // springs: stiffer on the water (it holds the hull), softer and slower in the air
-    const ky = state.skim ? 1.6 : 22, cy = state.skim ? 1.9 : 6.5;
-    dyn.vy += ((wantY - dyn.y) * ky - dyn.vy * cy) * dt;
-    if (state.skim) dyn.vy = Math.max(-6, Math.min(5, dyn.vy));
+    // fly: E / Space climbs, Q sinks (the stick on touch), and the sky lane is anything above 60 m
+    if (!state.held) {
+      const up = keys.has("e") || keys.has(" ") || virtual.climb > 0, down = keys.has("q") || virtual.climb < 0;
+      if (up) state.flyAlt = Math.min(620, state.flyAlt + 34 * dt);
+      if (down) state.flyAlt = Math.max(HOVER_MIN, state.flyAlt - 34 * dt);
+    }
+    state.skim = state.flyAlt > 60;
+    const speedK = Math.min(1, Math.abs(vF) / 20);
+    const wantY = state.flyAlt + Math.sin(time * 0.9) * 0.3 + Math.sin(time * 2.3 + 1.1) * 0.08;
+    const wantPitch = -dyn.vy * 0.012 + (throttle > 0 ? -0.04 : throttle < 0 ? 0.035 : 0.008) * speedK;
+    const wantRoll = steer * speedK * 0.4 - vL * 0.012;
+    dyn.vy += ((wantY - dyn.y) * 2.4 - dyn.vy * 2.7) * dt;
+    dyn.vy = Math.max(-28, Math.min(28, dyn.vy));
     dyn.y += dyn.vy * dt;
     dyn.vp += ((wantPitch - dyn.pitch) * 16 - dyn.vp * 4.2) * dt;
     dyn.pitch += dyn.vp * dt;
     dyn.vr += ((wantRoll - dyn.roll) * 14 - dyn.vr * 3.6) * dt;
     dyn.roll += dyn.vr * dt;
-    // touching down: a splash sized by how hard it hit
-    const wet = dyn.y < FLOAT_Y + 1.2;
-    if (wet && !wasWet && water) {
-      const hit = Math.min(1.6, Math.max(0.35, -dyn.vy / 4));
-      water.splash(state.pos.x, state.pos.z, hit, 9);
-      dyn.vy *= 0.35;
-      api.onSplash?.(hit);
-    }
-    wasWet = wet;
     state.pos.y = dyn.y;
-    state.alt = dyn.y;
+    state.alt = dyn.y; // above the street
     state.heave = dyn.vy;
     state.pitch = dyn.pitch;
     state.bank = dyn.roll;
@@ -404,15 +429,15 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
   function knock(hard = false) {
     state.blocked = hard ? 0.8 : 0.5;
     const now = performance.now() / 1000;
-    if (!water || now - lastKnock < 0.6) return;
+    if (now - lastKnock < 0.6) return;
     lastKnock = now;
-    const f = -Math.sin(state.yaw), z = -Math.cos(state.yaw);
-    water.splash(state.pos.x + f * 10, state.pos.z + z * 10, hard ? 0.8 : 0.4, 5);
+    api.onKnock?.(hard);
   }
 
   // ---- cameras -----------------------------------------------------------------------------------------------------
   const camPos = new THREE.Vector3(0, 14, 600), camLook = new THREE.Vector3(0, 6, 400);
   let snap = true;
+  let camYaw = 0; // the chase camera's own heading: it swings round after the hull's, on a circle
   let boarding = null; // { t, from, fromLook } while the camera dives from the title shot to the chase camera
   const pointer = { x: 0, y: 0 }, parallax = { x: 0, y: 0 };
   let introAt = -1;
@@ -477,8 +502,11 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
       // a tall phone screen sees more height than width: sit further back and higher so the shuttle fits
       const tall = camera.aspect < 0.8 ? 1.45 : 1;
       const back = (state.skim ? 40 : 34) * tall, up = (state.skim ? 12 : 10) * tall;
-      wantPos = p.clone().addScaledVector(f, -back).add(new THREE.Vector3(0, up + state.look.pitch * 30, 0));
-      wantLook = p.clone().addScaledVector(f, 34).add(new THREE.Vector3(0, 3.5 + state.gaze, 0));
+      // the camera follows the hull's heading round a circle, so a U-turn sweeps it round behind, never alongside
+      camYaw += Math.atan2(Math.sin(yaw - camYaw), Math.cos(yaw - camYaw)) * (snap || boarding ? 1 : 1 - Math.exp(-dt * 2.4));
+      const fc = new THREE.Vector3(-Math.sin(camYaw), 0, -Math.cos(camYaw));
+      wantPos = p.clone().addScaledVector(fc, -back).add(new THREE.Vector3(0, up + state.look.pitch * 30, 0));
+      wantLook = p.clone().addScaledVector(fc, 34).add(new THREE.Vector3(0, 3.5 + state.gaze, 0));
       wantPos.y -= state.gaze * 0.12;
     }
     if (boarding) {
@@ -505,7 +533,8 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
       }
       return;
     }
-    const k = snap ? 1 : 1 - Math.exp(-dt * 3.2);
+    // (the chase camera's lag is in its heading; its position only smooths the bob, and drops back a little at speed)
+    const k = snap ? 1 : 1 - Math.exp(-dt * (state.view === "chase" ? 9 : 3.2));
     camPos.lerp(wantPos, k);
     // never let the hull run up to the lens (after a bounce or a slide the lagging camera would be too close)
     if (state.view === "chase") {
@@ -531,6 +560,7 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
     update,
     board() {
       if (state.view !== "title") return;
+      camYaw = state.yaw;
       boarding = { t: 0, from: camPos.clone(), fromLook: camLook.clone() };
       state.view = "chase";
       api.onView?.("chase");
@@ -546,6 +576,12 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
     },
     get trip() {
       return trip;
+    },
+    /** The trip's route still to fly, from the next waypoint to its end (for the guidance line). */
+    routeAhead() {
+      if (!trip) return null;
+      guidePoint();
+      return route.slice(routeIx).map((v) => ({ x: v.x, z: v.y }));
     },
     /** The next turn of the trip's route, for the direction arrow (null when not on a trip). */
     guide() {
@@ -566,9 +602,12 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
       }
     },
     /** Fly to one of the chapters on autopilot and stop there. */
-    /** Put the shuttle back on the water at (x, z) facing yaw, at rest (the recall from far out in the wards). */
+    /** Put the shuttle back on the avenue at (x, z) facing yaw, at rest (the recall from far out in the wards). */
     recall(x, z, yaw = 0) {
-      state.pos.set(x, FLOAT_Y, z);
+      state.flyAlt = HOVER;
+      dyn.y = HOVER;
+      dyn.vy = 0;
+      state.pos.set(x, HOVER, z);
       state.yaw = yaw;
       state.speed = 0;
       vel.set(0, 0);
@@ -579,19 +618,20 @@ export function createFlight({ camera, shuttle, plan, params, water }) {
       gazeTarget = lift;
       gazeUntil = nowT + secs;
     },
-    goTo(name, x, z) {
+    goTo(name, x, z, face = null) {
       route = planTrip(x, z);
       routeIx = 0;
-      trip = { name, x, z };
+      trip = { name, x, z, face };
+      faceTarget = null;
       state.autopilot = true;
-      state.skim = false;
     },
     /** The home screen's opening move: the camera eases in along the boardwalk as the doors part. */
     intro(time) {
       introAt = time;
     },
+    /** F: up to the sky lane, or back down to the street. */
     toggleSkim() {
-      state.skim = !state.skim;
+      state.flyAlt = state.flyAlt > 60 ? HOVER : SKY_LANE;
     },
     forward() {
       return new THREE.Vector3(-Math.sin(state.yaw), 0, -Math.cos(state.yaw));

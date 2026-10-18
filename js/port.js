@@ -17,7 +17,7 @@ import { createBillboards } from "./billboards.js";
 import { pagoda, torii, buildRoofs, buildRails, buildSakura, buildPetals, buildSignBoxes, NEON } from "./japan.js";
 import { createKrakenVision } from "./kraken.js";
 import { createCrab } from "./crab.js";
-import { createWater } from "./water.js";
+import { createWater } from "./ground.js";
 import { createPagoda } from "./pagoda.js";
 import { harbourFront } from "./hero.js";
 import { createDistricts } from "./districts.js";
@@ -46,14 +46,15 @@ export const PORT = {
 
 export const LOOK = {
   day: {
-    hazeDim: "#5a3118", hazeBright: "#e8ae62", hazeGlow: "#ffe6b8", zenith: "#3c1c0c", water: "#0b0604", glowLow: "#000000",
-    density: 0.0019, sun: "#ffc98a", sunI: 2.0, hemiSky: "#a8723e", hemiGround: "#140c06", hemiI: 0.75,
-    windows: 0.09, lamps: 0.35, screens: 1.0, exposure: 0.95, rain: 0.4, reflect: 0.8,
+    // Rive City's afternoon: the canyon's far end a bright backlit haze, the walls near you dark with warm windows lit
+    hazeDim: "#4a3f37", hazeBright: "#e2cdb0", hazeGlow: "#fff3df", zenith: "#6e655e", water: "#14110e", glowLow: "#000000",
+    density: 0.0019, mist: 0.00012, sun: "#ffe9cc", sunI: 1.7, hemiSky: "#8f8070", hemiGround: "#1c1612", hemiI: 0.62,
+    windows: 0.85, lamps: 0.3, screens: 0.95, exposure: 0.96, rain: 0.4, reflect: 0.45,
   },
   night: {
-    hazeDim: "#100d2c", hazeBright: "#2a1a52", hazeGlow: "#6a2a86", zenith: "#04030e", water: "#030209", glowLow: "#3c2478",
-    density: 0.00135, sun: "#7c90c8", sunI: 0.22, hemiSky: "#2e2a6a", hemiGround: "#0a0608", hemiI: 0.9,
-    windows: 1.2, lamps: 1.15, screens: 1.15, exposure: 1.12, rain: 0.7, reflect: 1.0,
+    hazeDim: "#0e0b26", hazeBright: "#241848", hazeGlow: "#5a2678", zenith: "#04030e", water: "#030209", glowLow: "#2a1a5a",
+    density: 0.0013, mist: 0.00045, sun: "#7c90c8", sunI: 0.22, hemiSky: "#2e2a6a", hemiGround: "#0a0608", hemiI: 0.9,
+    windows: 1.15, lamps: 1.05, screens: 1.08, exposure: 1.0, rain: 0.7, reflect: 1.0,
   },
 };
 
@@ -78,7 +79,7 @@ export function createPort({ quality = { reflect: 0.5 }, night = false, renderer
     rain: uniform(1),
     reflect: uniform(1),
     rainLook: 1,
-    mist: uniform(0.0009),
+    mist: uniform(0.00045),
   };
 
   // ---- haze: the fog colour is the sky colour in the same direction, brighter toward the sun -------------
@@ -113,7 +114,8 @@ export function createPort({ quality = { reflect: 0.5 }, night = false, renderer
     const dens = U.mist.mul(banks.mul(1.3).add(0.35));
     return float(1.0).sub(exp(along.mul(dens).negate())).mul(0.9);
   });
-  const mistColor = (dir) => U.hazeBright.mul(1.25).add(U.glowLow.mul(0.55)).add(mistLight(positionWorld).mul(0.4).mul(U.night)).add(hazeColor(dir).mul(0.3));
+  // (by night the mist glows with the neon round it; by day it is only the haze, lying a little thicker on the street)
+  const mistColor = (dir) => mix(hazeColor(dir).mul(0.92), U.hazeBright.mul(0.95).add(U.glowLow.mul(0.32)).add(mistLight(positionWorld).mul(0.2)).add(hazeColor(dir).mul(0.3)), U.night);
   if (new URLSearchParams(location.search).has("nomist")) scene.fogNode = fog(hazeColor(normalize(positionWorld.sub(cameraPosition))), fogFactor());
   else {
     const dir = normalize(positionWorld.sub(cameraPosition));
@@ -168,8 +170,8 @@ export function createPort({ quality = { reflect: 0.5 }, night = false, renderer
   const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 1);
   scene.add(hemi);
 
-  // ---- the sea: swell, a simulated wake round the shuttle, foam and spray (water.js) ---------------------------------
-  const water = createWater({ scene, U, quality, renderer });
+  // ---- the streets: wet asphalt avenues and a plaza to the horizon, one mirror (ground.js) ---------------------------
+  const water = createWater({ scene, U, quality, cross: PORT.cross, homeX: 780 });
 
   // ---- the city -------------------------------------------------------------------------------------------
   const plan = layout();
@@ -201,7 +203,7 @@ export function createPort({ quality = { reflect: 0.5 }, night = false, renderer
     const c = (k) => new THREE.Color(a[k]).lerp(new THREE.Color(b[k]), x);
     const f = (k) => a[k] + (b[k] - a[k]) * x;
     for (const k of ["hazeDim", "hazeBright", "hazeGlow", "glowLow", "zenith", "water"]) U[k].value.copy(c(k));
-    for (const k of ["density", "windows", "lamps", "screens", "reflect"]) U[k].value = f(k);
+    for (const k of ["density", "mist", "windows", "lamps", "screens", "reflect"]) U[k].value = f(k);
     U.rainLook = f("rain");
     sun.color.copy(c("sun"));
     sun.intensity = f("sunI");
@@ -315,13 +317,14 @@ function layout() {
       if (p.side > 0 && !P.crab && za > PORT.channel.z0 - 80) {
         // かに港: the crab restaurant at the harbour mouth, its white slatted front facing the boats coming in
         const front = edgeX - toward * walk;
-        const depth = 42, dz = 24, height = 27;
+        const depth = 42, dz = 24, height = 35;
         const xc = front - toward * (depth / 2);
         const zc = z - dz / 2;
         box({ x: xc, y: deck + height / 2, z: zc, sx: depth, sy: height, sz: dz, kind: 10, seed: 0.37 });
         P.roofs.push({ x: xc, y: deck + height - 0.2, z: zc, sx: depth / 2 + 3.5, sy: 4.5, sz: dz / 2 + 3.5, neon: NEON.amber, tile: 1 });
         P.signs.push({ x: xc, y: deck + 7.4, z: z + 0.6, w: 32, h: 4.4, orient: "blade", vertical: false, sign: 8 });
-        P.crab = { x: xc, y: deck + 17.5, z: z + 2.4, ry: 0, scale: 0.98 };
+        // (sized to the front: above the sign, under the eave, inside both edges)
+        P.crab = { x: xc, y: deck + 21.5, z: z + 2.6, ry: 0, scale: 1.1 };
         z -= dz + 6;
       }
       if (p.side < 0 && !P.vision && Math.abs(za - (c0.z - c0.w / 2)) < 1) {
@@ -435,7 +438,7 @@ function layout() {
   for (const t of [
     { z: 330, y: 44, r: 3.4 },
     { z: 120, y: 96, r: 3.0 },
-    { z: -90, y: 58, r: 3.6 },
+    { z: -200, y: 34, r: 3.6 }, // (low, so it never crosses the view up to the pagoda from where the trip stops)
     { z: -640, y: 52, r: 3.4 },
     { z: -880, y: 76, r: 3.4 },
     { z: -1010, y: 150, r: 2.8 },
@@ -702,7 +705,7 @@ function glassSky(U, pane, lit) {
   const vdir = normalize(positionWorld.sub(cameraPosition));
   const n = normalWorld;
   const fres = pow(float(1.0).sub(abs(dot(vdir, n))), 4.0).mul(0.75).add(0.05);
-  return U.hazeColor(vdir.reflect(n)).mul(fres).mul(pane).mul(float(1.0).sub(lit)).mul(mix(float(0.55), float(0.12), U.night));
+  return U.hazeColor(vdir.reflect(n)).mul(fres).mul(pane).mul(float(1.0).sub(lit)).mul(mix(float(0.24), float(0.12), U.night));
 }
 
 function buildCity(U, plan) {

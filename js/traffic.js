@@ -18,9 +18,10 @@ function families(quality) {
   const Q = quality.particles ?? 1;
   const fam = [];
   // the channel canyons: low and busy
-  for (const y of [26, 38, 54, 72, 94, 120, 150, 186]) for (const o of [-24, -10, 10, 24]) fam.push({ axis: 1, P: WORLD.CH, O: o, y, speed: 34 + (y % 7) * 4, n: Math.max(2, Math.round(7 * Q)), K: [-1, 0, 1] });
+  // (dense, the way Rive City's canyon streams with tail lights at every height)
+  for (const y of [26, 38, 54, 72, 94, 120, 150, 186]) for (const o of [-24, -10, 10, 24]) fam.push({ axis: 1, P: WORLD.CH, O: o, y, speed: 34 + (y % 7) * 4, n: Math.max(2, Math.round(11 * Q)), K: [-1, 0, 1] });
   // the cross canals
-  for (const y of [32, 50, 74, 102, 136]) for (const o of [-9, 9]) fam.push({ axis: 0, P: WORLD.CR, O: WORLD.Z0 + o, y, speed: 30 + (y % 5) * 5, n: Math.max(2, Math.round(6 * Q)), K: [-2, -1, 0, 1, 2] });
+  for (const y of [32, 50, 74, 102, 136]) for (const o of [-9, 9]) fam.push({ axis: 0, P: WORLD.CR, O: WORLD.Z0 + o, y, speed: 30 + (y % 5) * 5, n: Math.max(2, Math.round(8 * Q)), K: [-2, -1, 0, 1, 2] });
   // high sky lanes over the roofs, both ways
   for (const y of [330, 362, 398]) {
     fam.push({ axis: 1, P: 420, O: 210, y, speed: 70, n: Math.max(2, Math.round(8 * Q)), K: [-2, -1, 0, 1, 2] });

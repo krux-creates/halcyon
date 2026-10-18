@@ -1,7 +1,7 @@
 // The harbour mouth, the scene the home screen opens on: a long wet boardwalk out over the sea to a stone landing
 // where the great torii stands, glowing; the Infinity Castle framed in the gate, climbing into the cloud. Round it: a
 // bloom of jellyfish in light drifting over the water, a woman in light kneeling on the right bank, a neon expressway sweeping
-// into the channel, an arched bridge, big vertical neon, cherry trees, and post lamps along the rails.
+// over the avenue, big vertical neon, cherry trees, and post lamps along the rails.
 // harbourFront() adds the buildings and trees to the port's plan; createHero() builds everything else.
 import * as THREE from "three";
 import {
@@ -106,8 +106,10 @@ export function createHero(U, { water, camera }) {
     const wob = vec2(mx_noise_float(vec3(p.x.mul(0.8), p.z.mul(0.8), U.time.mul(0.5))), mx_noise_float(vec3(p.z.mul(0.8), p.x.mul(0.8), U.time.mul(0.5).add(4.0)))).mul(0.006);
     const refl = water.reflection.uv(screenUV.flipX().add(wob)).rgb;
     m.colorNode = base.mul(float(1.0).sub(wet.mul(0.45))).mul(float(1.0).sub(seam.mul(0.5)));
-    m.emissiveNode = refl.mul(fres.mul(0.85).add(0.04)).mul(wet).mul(0.78);
-    m.roughnessNode = mix(rough, float(0.32), wet);
+    // (by day the backlit haze in the puddles would glare: the boards give back less of it)
+    m.emissiveNode = refl.mul(fres.mul(0.85).add(0.04)).mul(wet).mul(0.78).mul(mix(float(0.38), float(1.0), U.night));
+    // (by day the low sun would glint off every wet plank: the wet is duller, so the boards don't flare)
+    m.roughnessNode = mix(rough, mix(float(0.62), float(0.32), U.night), wet);
     m.metalnessNode = float(0.0);
     return m;
   };
@@ -297,9 +299,6 @@ export function createHero(U, { water, camera }) {
   ]);
   group.add(highway.group);
 
-  // ---- an arched bridge low across the channel -------------------------------------------------------------------------
-  group.add(buildArchBridge(U, 450));
-
   group.traverse((o) => (o.frustumCulled = false));
   return {
     group,
@@ -400,7 +399,13 @@ function buildHighway(U, pts) {
     deck.setIndex(idx);
     deck.computeVertexNormals();
   }
-  const deckMat = new THREE.MeshStandardNodeMaterial({ color: 0x0d0c12, roughness: 0.7, metalness: 0.2, side: THREE.DoubleSide });
+  // weathered concrete: pale where the day catches it, stained in streaks below the parapets, joints every 15 m
+  const deckMat = new THREE.MeshStandardNodeMaterial({ roughness: 0.82, metalness: 0.05, side: THREE.DoubleSide });
+  {
+    const stain = mx_noise_float(vec3(positionWorld.x.mul(0.08), positionWorld.y.mul(0.5), positionWorld.z.mul(0.08))).mul(0.5).add(0.5);
+    const joint = step(0.97, fract(uv().x.div(15.0)));
+    deckMat.colorNode = mix(vec3(0.2, 0.19, 0.18), vec3(0.075, 0.07, 0.075), U.night).mul(stain.mul(0.4).add(0.7)).mul(float(1.0).sub(joint.mul(0.5)));
+  }
   group.add(new THREE.Mesh(deck, deckMat));
   // neon edges and the traffic on top: thin ribbons
   const ribbon = (offset, width, y) => {
@@ -420,6 +425,7 @@ function buildHighway(U, pts) {
     geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
     geo.setIndex(idx);
+    geo.computeVertexNormals();
     return geo;
   };
   const neon = (col) => {
@@ -470,49 +476,7 @@ function buildHighway(U, pts) {
   const pilMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(3.2, 1, 3.2), deckMat, pil.length);
   pil.forEach((p, i) => pilMesh.setMatrixAt(i, new THREE.Matrix4().compose(new THREE.Vector3(p.x, (p.y - T) / 2, p.z), new THREE.Quaternion(), new THREE.Vector3(1, p.y - T, 1))));
   group.add(pilMesh);
-  return { group, solids: pil.map((p) => ({ x0: p.x - 2.6, x1: p.x + 2.6, z0: p.z - 2.6, z1: p.z + 2.6 })) };
-}
-
-/** A stone arched bridge across the channel with lamps on its balustrade and a magenta line under the arch. */
-function buildArchBridge(U, z) {
-  const group = new THREE.Group();
-  const half = PORT.channel.halfW + 6;
-  const N = 48;
-  const yAt = (x) => 5 + 10 * Math.cos((x / half) * (Math.PI / 2));
-  const pos = [], idx = [];
-  for (let i = 0; i <= N; i++) {
-    const x = -half + (2 * half * i) / N;
-    const y = yAt(x);
-    for (const [dz, dy] of [[-4, 0], [4, 0], [4, -1.6], [-4, -1.6]]) pos.push(x, y + dy, z + dz);
-  }
-  for (let i = 0; i < N; i++) for (let k = 0; k < 4; k++) {
-    const a = i * 4 + k, b = i * 4 + ((k + 1) % 4), c = a + 4, d = b + 4;
-    idx.push(a, c, b, b, c, d);
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  geo.setIndex(idx);
-  geo.computeVertexNormals();
-  const stone = new THREE.MeshStandardNodeMaterial({ color: 0x17141c, roughness: 0.75, side: THREE.DoubleSide });
-  group.add(new THREE.Mesh(geo, stone));
-  // lamps on the balustrade
-  const pts = [];
-  for (let i = 0; i <= 8; i++) {
-    const x = -half + (2 * half * i) / 8;
-    for (const dz of [-3.8, 3.8]) pts.push([x, yAt(x) + 1.6, z + dz, 1.6, 1.0, 0.62, 0.3]);
-  }
-  group.add(glowPoints(U, pts, { blink: false, gain: 1.1 }));
-  // the magenta line under the arch
-  const lp = [];
-  for (let i = 0; i <= N; i++) {
-    const x = -half + (2 * half * i) / N;
-    lp.push(new THREE.Vector3(x, yAt(x) - 1.7, z + 4.05));
-  }
-  const tube = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(lp), 96, 0.12, 6, false);
-  const nm = new THREE.MeshBasicNodeMaterial();
-  nm.colorNode = vec3(1.0, 0.16, 0.6).mul(mix(float(0.5), float(2.4), U.night));
-  group.add(new THREE.Mesh(tube, nm));
-  return group;
+  return { group, solids: pil.map((p) => ({ x0: p.x - 2.6, x1: p.x + 2.6, z0: p.z - 2.6, z1: p.z + 2.6, top: p.y })) };
 }
 
 void cos;
